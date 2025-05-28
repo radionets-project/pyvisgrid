@@ -262,7 +262,7 @@ class Gridder:
     @classmethod
     def from_ms(
         cls,
-        path,
+        path: str,
         img_size: int,
         fov: float,
         desc_id: int or None = None,
@@ -303,7 +303,7 @@ class Gridder:
                 f"This measurement set does not exist under the path {path}"
             )
 
-        tab = table(path)
+        tab = table(str(path))
 
         if desc_id is not None:
             mask = tab.getcol("DATA_DESC_ID") == desc_id
@@ -314,7 +314,7 @@ class Gridder:
             uvw = tab.getcol("UVW").T
 
         try:
-            freq = table(path + "SPECTRAL_WINDOW").getcol("CHAN_FREQ").T
+            freq = table(str(path / "SPECTRAL_WINDOW")).getcol("CHAN_FREQ").T
         except Exception:
             freq = fallback_frequency
 
