@@ -9,6 +9,7 @@ from casatools.table import table
 from numpy.exceptions import AxisError
 from pyvisgen.simulation import Visibilities
 
+import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
 
 
@@ -166,6 +167,14 @@ class Gridder:
 
         delta_uv = (self.fov) ** (-1)
 
+        print(
+            dict(
+                start=-(N / 2 + 1 / 2) * delta_uv,
+                stop=(N / 2 + 1 / 2) * delta_uv,
+                step=delta_uv,
+                dtype=np.float128,
+            )
+        )
         bins = np.arange(
             start=-(N / 2 + 1 / 2) * delta_uv,
             stop=(N / 2 + 1 / 2) * delta_uv,
@@ -453,3 +462,12 @@ class Gridder:
         cls.stokes["I"] = GridData(vis_data=stokes_i)
 
         return cls
+
+    def plot_ungridded_uv(self, **kwargs):
+        return plotting.plot_ungridded_uv(self, **kwargs)
+
+    def plot_mask(self, stokes_component: str = "I", **kwargs):
+        return plotting.plot_mask(self[stokes_component], **kwargs)
+
+    def plot_dirty_image(self, stokes_component: str = "I", **kwargs):
+        return plotting.plot_dirty_image(self[stokes_component], **kwargs)
