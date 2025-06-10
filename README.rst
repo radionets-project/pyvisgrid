@@ -19,6 +19,6 @@ You can install the necessary packages in a conda environment of your choice by 
 
   $ pip install -e .
 
-We recommend using a conda/mamba environment with python version `<=3.11`.
+We recommend using a conda/mamba environment with python version ``<=3.11``.
 
 If you want to use features from the NRAO CASAtools package, make sure you are using python 3.10 or 3.11.
