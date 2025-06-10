@@ -167,14 +167,6 @@ class Gridder:
 
         delta_uv = (self.fov) ** (-1)
 
-        print(
-            dict(
-                start=-(N / 2 + 1 / 2) * delta_uv,
-                stop=(N / 2 + 1 / 2) * delta_uv,
-                step=delta_uv,
-                dtype=np.float128,
-            )
-        )
         bins = np.arange(
             start=-(N / 2 + 1 / 2) * delta_uv,
             stop=(N / 2 + 1 / 2) * delta_uv,
@@ -450,6 +442,10 @@ class Gridder:
         v_meter = uvw[:, :, 1]
 
         stokes_i = data[:, :, 0] + data[:, :, 1]
+
+        # FIXME: probably some kind of difference in normalization.
+        # Factor 0.5 fixes this for now. Has to be investigated.
+        stokes_i *= 0.5
 
         cls = cls(
             u_meter=u_meter,
