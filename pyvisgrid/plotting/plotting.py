@@ -58,7 +58,7 @@ def _get_norm(norm: str):
     The name of the norm.
     Possible values are:
 
-      - ``log``:        Returns a logarithmic norm with clipping on (!), meaning values
+    - ``log``:          Returns a logarithmic norm with clipping on (!), meaning values
                         above the maximum will be mapped to the maximum and values below
                         the minimum will be mapped to the minimum, thus avoiding the
                         appearance of a colormaps 'over' and 'under' colors (e.g. in the
@@ -66,14 +66,14 @@ def _get_norm(norm: str):
                         desirable but in case that it is not, one can
                         set the norm to ``log_noclip`` or provide a custom norm.
 
-      - ``log_noclip``: Returns a logarithmic norm with clipping off.
+    - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
-      - ``centered``:   Returns a linear norm which centered around zero.
+    - ``centered``:     Returns a linear norm which centered around zero.
 
-      - ``sqrt``:       Returns a power norm with exponent 0.5, meaning the square-root
+    - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the square-root
                         of the values.
 
-      - other:          A value not declared above will be returned as is, meaning that
+    - other:            A value not declared above will be returned as is, meaning that
                         this could be any value which exists in matplotlib itself.
 
     Returns
@@ -246,20 +246,20 @@ def plot_mask(
 
     Possible values are:
 
-      - ``hist``:   Plots the number of (u,v) points which are sorted in
+    - ``hist``:     Plots the number of (u,v) points which are sorted in
                     each pixel of the image in the (u,v) space.
 
-      - ``abs``:    Plots the absolute value of the gridded visibilities,
+    - ``abs``:      Plots the absolute value of the gridded visibilities,
                     meaning the magnitude of the complex numbers in Euler
                     representation.
 
-      - ``phase``:  Plots the phase angle of the gridded visibilities,
+    - ``phase``:    Plots the phase angle of the gridded visibilities,
                     meaning the angle in the exponent of the complex numbers in
                     Euler representation.
 
-      - ``real``:   Plots the real part of the gridded visibilities.
+    - ``real``:     Plots the real part of the gridded visibilities.
 
-      - ``imag``:   Plots the imaginary part of the gridded visibilities.
+    - ``imag``:     Plots the imaginary part of the gridded visibilities.
 
     Default is ``hist``.
 
@@ -276,7 +276,7 @@ def plot_mask(
     The name of the norm or a matplotlib norm.
     Possible values are:
 
-      - ``log``:        Returns a logarithmic norm with clipping on (!), meaning values
+    - ``log``:          Returns a logarithmic norm with clipping on (!), meaning values
                         above the maximum will be mapped to the maximum and values below
                         the minimum will be mapped to the minimum, thus avoiding the
                         appearance of a colormaps 'over' and 'under' colors (e.g. in the
@@ -285,14 +285,14 @@ def plot_mask(
                         it is not, one can set the norm to ``log_noclip`` or provide a
                         custom norm.
 
-      - ``log_noclip``: Returns a logarithmic norm with clipping off.
+    - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
-      - ``centered``:   Returns a linear norm which centered around zero.
+    - ``centered``:     Returns a linear norm which centered around zero.
 
-      - ``sqrt``:       Returns a power norm with exponent 0.5, meaning the square-root
+    - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the square-root
                         of the values.
 
-      - other:          A value not declared above will be returned as is, meaning that
+    - other:            A value not declared above will be returned as is, meaning that
                         this could be any value which exists in matplotlib itself.
 
     Default is ``None``, meaning no norm will be applied.
@@ -465,11 +465,11 @@ def plot_dirty_image(
 
     Possible values are:
 
-      - ``real``:   Plots the real part of the dirty image.
+    - ``real``:     Plots the real part of the dirty image.
 
-      - ``imag``:   Plots the imaginary part of the dirty image.
+    - ``imag``:     Plots the imaginary part of the dirty image.
 
-      - ``abs``:    Plot the absolute value of the dirty image.
+    - ``abs``:      Plot the absolute value of the dirty image.
 
     Default is ``real``.
 
@@ -486,7 +486,7 @@ def plot_dirty_image(
     The name of the norm or a matplotlib norm.
     Possible string values are:
 
-      - ``log``:        Returns a logarithmic norm with clipping on (!), meaning values
+    - ``log``:          Returns a logarithmic norm with clipping on (!), meaning values
                         above the maximum will be mapped to the maximum and values below
                         the minimum will be mapped to the minimum, thus avoiding the
                         appearance of a colormaps 'over' and 'under' colors (e.g. in
@@ -494,14 +494,14 @@ def plot_dirty_image(
                         desirable but in case that it is not, one can set the norm to
                         ``log_noclip`` or provide a custom norm.
 
-      - ``log_noclip``: Returns a logarithmic norm with clipping off.
+    - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
-      - ``centered``:   Returns a linear norm which centered around zero.
+    - ``centered``:     Returns a linear norm which centered around zero.
 
-      - ``sqrt``:       Returns a power norm with exponent 0.5, meaning the square-root
+    - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the square-root
                         of the values.
 
-      - other:          A value not declared above will be returned as is, meaning that
+    - other:            A value not declared above will be returned as is, meaning that
                         this could be any value which exists in matplotlib itself.
 
     Default is ``None``, meaning no norm will be applied.

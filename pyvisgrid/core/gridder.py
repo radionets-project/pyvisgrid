@@ -464,10 +464,292 @@ class Gridder:
         return cls
 
     def plot_ungridded_uv(self, **kwargs):
+        """
+        Plots the ungridded (u,v) points as a scatter plot.
+
+        Parameters
+        ----------
+
+        mode : str, optional
+        The mode specifying the scale of the (u,v) coordinates.
+        This can be either ``wave``, meaning the coordinates are
+        plotted in units of the reference wavelength, or ``meter``,
+        meaning the (u,v) coordinates will be plotted in meter.
+        Default is ``wave``.
+
+        marker_size : float | None, optional
+        The size of the scatter markers in points**2.
+        Default is ``None``, meaning the default value supplied by
+        your matplotlib rcParams.
+
+        plot_args : dict, optional
+        The additional arguments passed to the scatter plot.
+        Default is ``{"color":"royalblue"}``.
+
+        fig_args : dict, optional
+        The additional arguments passed to the figure.
+        If a figure object is given in the ``fig`` parameter, this
+        value will be discarded.
+        Default is ``{}``.
+
+        save_to : str | None, optional
+        The name of the file to save the plot to.
+        Default is ``None``, meaning the plot won't be saved.
+
+        save_args : dict, optional
+        The additional arugments passed to the ``fig.savefig`` call.
+        Default is ``{"bbox_inches":"tight"}``.
+
+        fig : matplotlib.figure.Figure | None, optional
+        A custom figure object.
+        If set to ``None``, the ``ax`` parameter also has to be ``None``!
+        Default is ``None``.
+
+        ax : matplotlib.axes.Axes | None, optional
+        A custom axes object.
+        If set to ``None``, the ``fig`` parameter also has to be ``None``!
+        Default is ``None``.
+
+        Returns
+        -------
+
+        fig : matplotlib.figure.Figure
+        The figure object.
+
+        ax : matplotlib.axes.Axes
+        The axes object.
+        """
+
         return plotting.plot_ungridded_uv(self, **kwargs)
 
     def plot_mask(self, stokes_component: str = "I", **kwargs):
+        """
+        Plots the (u,v) mask (the binned visibilities) of the gridded
+        interferometric image.
+
+        Parameters
+        ----------
+
+        stokes_component : str, optional
+        The symbol of the stokes component whose mask should be plotted.
+        The specified component has to be initialized and gridded first!
+        Otherwise this will result in a ``KeyError``.
+        Default is ``'I'``.
+
+        mode : str, optional
+        The mode specifying which values of the mask should be plotted.
+
+        Possible values are:
+
+        - ``hist``:     Plots the number of (u,v) points which are sorted in
+                        each pixel of the image in the (u,v) space.
+
+        - ``abs``:      Plots the absolute value of the gridded visibilities,
+                        meaning the magnitude of the complex numbers in Euler
+                        representation.
+
+        - ``phase``:    Plots the phase angle of the gridded visibilities,
+                        meaning the angle in the exponent of the complex numbers in
+                        Euler representation.
+
+        - ``real``:     Plots the real part of the gridded visibilities.
+
+        - ``imag``:     Plots the imaginary part of the gridded visibilities.
+
+        Default is ``hist``.
+
+        crop : tuple[list[float | None]], optional
+        The crop of the image. This has to have the format
+        ``([x_left, x_right], [y_left, y_right])``, where the left and right
+        values for each axis are the upper and lower limits of the axes which
+        should be shown.
+        IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
+        via the ``plot_args`` parameter, this will be the scale in which one
+        has to give the crop! If not, the crop has to be in pixels.
+
+        norm : str | matplotlib.colors.Normalize | None, optional
+        The name of the norm or a matplotlib norm.
+        Possible values are:
+
+        - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
+                            values above the maximum will be mapped to the maximum and
+                            values below the minimum will be mapped to the minimum,
+                            thus avoiding the appearance of a colormaps 'over' and
+                            'under' colors (e.g. in the case of negative values).
+                            Depending on the use case this is desirable but in case that
+                            it is not, one can set the norm to ``log_noclip`` or provide
+                            a custom norm.
+
+        - ``log_noclip``:   Returns a logarithmic norm with clipping off.
+
+        - ``centered``:     Returns a linear norm which centered around zero.
+
+        - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the
+                            square-root of the values.
+
+        - other:            A value not declared above will be returned as is, meaning
+                            that this could be any value which exists in
+                            matplotlib itself.
+
+        Default is ``None``, meaning no norm will be applied.
+
+        colorbar_shrink: float, optional
+        The shrink parameter of the colorbar. This can be needed if the plot is
+        included as a subplot to adjust the size of the colorbar.
+        Default is ``1``, meaning original scale.
+
+        cmap: str | matplotlib.colors.Colormap | None, optional
+        The colormap to be used for the plot.
+        Default is ``None``, meaning the colormap will be default to a value
+        fitting for the chosen mode.
+
+        plot_args : dict, optional
+        The additional arguments passed to the scatter plot.
+        Default is ``{"color":"royalblue"}``.
+
+        fig_args : dict, optional
+        The additional arguments passed to the figure.
+        If a figure object is given in the ``fig`` parameter, this
+        value will be discarded.
+        Default is ``{}``.
+
+        save_to : str | None, optional
+        The name of the file to save the plot to.
+        Default is ``None``, meaning the plot won't be saved.
+
+        save_args : dict, optional
+        The additional arugments passed to the ``fig.savefig`` call.
+        Default is ``{"bbox_inches":"tight"}``.
+
+        fig : matplotlib.figure.Figure | None, optional
+        A custom figure object.
+        If set to ``None``, the ``ax`` parameter also has to be ``None``!
+        Default is ``None``.
+
+        ax : matplotlib.axes.Axes | None, optional
+        A custom axes object.
+        If set to ``None``, the ``fig`` parameter also has to be ``None``!
+        Default is ``None``.
+
+        Returns
+        -------
+
+        fig : matplotlib.figure.Figure
+        The figure object.
+
+        ax : matplotlib.axes.Axes
+        The axes object.
+        """
+
         return plotting.plot_mask(self[stokes_component], **kwargs)
 
     def plot_dirty_image(self, stokes_component: str = "I", **kwargs):
+        """
+        Plots the (u,v) dirty image, meaning the 2d Fourier transform of the
+        gridded visibilities.
+
+        Parameters
+        ----------
+
+        stokes_component : str, optional
+        The symbol of the stokes component whose dirty image should be plotted.
+        The specified component has to be initialized and gridded first!
+        Otherwise this will result in a ``KeyError``.
+        Default is ``'I'``.
+
+        mode : str, optional
+        The mode specifying which values of the mask should be plotted.
+
+        Possible values are:
+
+        - ``real``:     Plots the real part of the dirty image.
+
+        - ``imag``:     Plots the imaginary part of the dirty image.
+
+        - ``abs``:      Plot the absolute value of the dirty image.
+
+        Default is ``real``.
+
+        crop : tuple[list[float | None]], optional
+        The crop of the image. This has to have the format
+        ``([x_left, x_right], [y_left, y_right])``, where the left and right
+        values for each axis are the upper and lower limits of the axes which
+        should be shown.
+        IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
+        via the ``plot_args`` parameter, this will be the scale in which one
+        has to give the crop! If not, the crop has to be in pixels.
+
+        norm : str | matplotlib.colors.Normalize | None, optional
+        The name of the norm or a matplotlib norm.
+        Possible values are:
+
+        - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
+                            values above the maximum will be mapped to the maximum and
+                            values below the minimum will be mapped to the minimum,
+                            thus avoiding the appearance of a colormaps 'over' and
+                            'under' colors (e.g. in the case of negative values).
+                            Depending on the use case this is desirable but in case that
+                            it is not, one can set the norm to ``log_noclip`` or provide
+                            a custom norm.
+
+        - ``log_noclip``:   Returns a logarithmic norm with clipping off.
+
+        - ``centered``:     Returns a linear norm which centered around zero.
+
+        - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the
+                            square-root of the values.
+
+        - other:            A value not declared above will be returned as is, meaning
+                            that this could be any value which exists in
+                            matplotlib itself.
+
+        Default is ``None``, meaning no norm will be applied.
+
+        colorbar_shrink: float, optional
+        The shrink parameter of the colorbar. This can be needed if the plot is
+        included as a subplot to adjust the size of the colorbar.
+        Default is ``1``, meaning original scale.
+
+        cmap: str | matplotlib.colors.Colormap | None, optional
+        The colormap to be used for the plot.
+        Default is ``None``, meaning the colormap will be default to a value
+        fitting for the chosen mode.
+
+        plot_args : dict, optional
+        The additional arguments passed to the scatter plot.
+        Default is ``{"color":"royalblue"}``.
+
+        fig_args : dict, optional
+        The additional arguments passed to the figure.
+        If a figure object is given in the ``fig`` parameter, this
+        value will be discarded.
+        Default is ``{}``.
+
+        save_to : str | None, optional
+        The name of the file to save the plot to.
+        Default is ``None``, meaning the plot won't be saved.
+
+        save_args : dict, optional
+        The additional arugments passed to the ``fig.savefig`` call.
+        Default is ``{"bbox_inches":"tight"}``.
+
+        fig : matplotlib.figure.Figure | None, optional
+        A custom figure object.
+        If set to ``None``, the ``ax`` parameter also has to be ``None``!
+        Default is ``None``.
+
+        ax : matplotlib.axes.Axes | None, optional
+        A custom axes object.
+        If set to ``None``, the ``fig`` parameter also has to be ``None``!
+        Default is ``None``.
+
+        Returns
+        -------
+
+        fig : matplotlib.figure.Figure
+        The figure object.
+
+        ax : matplotlib.axes.Axes
+        The axes object.
+        """
         return plotting.plot_dirty_image(self[stokes_component], **kwargs)
