@@ -42,6 +42,7 @@ dependencies = [
   "torch",
   "tqdm",
   "casatools",
+  "pyvisgen@git+https://github.com/radionets-project/pyvisgen#egg=main",
 ]
 
 [project.optional-dependencies]
