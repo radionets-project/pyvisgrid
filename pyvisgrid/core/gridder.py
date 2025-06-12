@@ -7,7 +7,7 @@ from astropy.constants import c
 from astropy.io import fits
 from casatools.table import table
 from numpy.exceptions import AxisError
-from pyvisgen.simulation import Visibilities
+from pyvisgen.simulation import Observation, Visibilities
 
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
@@ -58,7 +58,8 @@ class Gridder:
         v_meter: numpy.ndarray,
         img_size: int,
         fov: float,
-        frequency: float,
+        ref_frequency: float,
+        frequency_offsets: numpy.typing.ArrayLike,
     ):
         """
 
@@ -83,15 +84,24 @@ class Gridder:
         fov : float
         The physical size of the image in asec.
 
-        frequency : float
+        ref_frequency : float
         The reference frequency of the data in Hertz.
+
+        frequency_offsets : numpy.typing.ArrayLike
+        The frequency offsets in Hertz.
 
         """
 
-        self.frequency = frequency
+        self.ref_frequency = ref_frequency
+        self.frequency_offsets = np.asarray(frequency_offsets)
 
-        self.u_wave = u_meter * self.frequency / c.value  # divide by wavelength
-        self.v_wave = v_meter * self.frequency / c.value  # divide by wavelength
+        self.frequencies = self.frequency_offsets + self.ref_frequency
+
+        u_wave = u_meter / c.value
+        v_wave = v_meter / c.value
+
+        self.u_wave = np.concatenate([u_wave * freq for freq in self.frequencies])
+        self.v_wave = np.concatenate([v_wave * freq for freq in self.frequencies])
 
         self.u_meter = u_meter
         self.v_meter = v_meter
@@ -209,9 +219,9 @@ class Gridder:
     def from_pyvisgen(
         cls,
         vis_data: Visibilities,
+        obs: Observation,
         img_size: int,
         fov: float,
-        frequency: float,
         stokes_components: list[str] | str = "I",
         polarizations: list[str] | str = "",
     ):
@@ -227,6 +237,10 @@ class Gridder:
         Parameters
         ----------
 
+        obs : pyvisgen.simulation.Observation
+        The obeservation which is returned by the
+        ``pyvisgen.simulation.vis_loop`` function.
+
         vis_data : pyvisgen.simulation.Visibilities
         The visibility data which is returned by the
         ``pyvisgen.simulation.vis_loop`` function.
@@ -236,9 +250,6 @@ class Gridder:
 
         fov : float
         The physical size of the image in asec.
-
-        frequency : float
-        The reference frequency of the data in Hertz.
 
         stokes_components : list[str] | str, optional
         The Stokes components which are to be calculated and saved in the gridder.
@@ -267,7 +278,8 @@ class Gridder:
             v_meter=v_meter.cpu().numpy(),
             img_size=img_size,
             fov=fov,
-            frequency=frequency,
+            ref_frequency=obs.ref_frequency,
+            frequency_offsets=obs.frequency_offsets,
         )
 
         if isinstance(stokes_components, str):
@@ -304,7 +316,7 @@ class Gridder:
         path: str,
         img_size: int,
         fov: float,
-        uv_colnames: list[str] = dict(u=None, v=None),
+        uv_colnames: dict = dict(u=None, v=None),
     ):
         """
 
@@ -326,8 +338,10 @@ class Gridder:
         fov : float
         The physical size of the image in asec.
 
-        frequency : float
-        The reference frequency of the data in Hertz.
+        uv_colnames : dict, optional
+        Alternative names for the U and V columns in the FITS file.
+        Default is {'u': None, 'v': None}, meaning the default values of
+        'UU' and 'VV' or 'UU--' and 'VV--' will be used.
 
         """
 
@@ -371,7 +385,8 @@ class Gridder:
             v_meter=v_meter,
             img_size=img_size,
             fov=fov,
-            frequency=file[0].header["CRVAL4"],
+            ref_frequency=file[0].header["CRVAL4"],
+            frequency_offsets=file[1].data["IF FREQ"],
         )
 
         cls.stokes["I"] = GridData(vis_data=stokes_i)
@@ -385,7 +400,7 @@ class Gridder:
         img_size: int,
         fov: float,
         desc_id: int | None = None,
-        fallback_frequency: float = 230e9,
+        fallback_frequency: float | None = None,
     ):
         """
         Initializes the Gridder with a measurement which is saved in an
@@ -409,9 +424,9 @@ class Gridder:
         This can be used to choose the component of a composite observation.
         Default is ``None``, which means that all observations will be used.
 
-        fallback_frequency: float, optional
+        fallback_frequency: float | None, optional
         The reference frequency in Hertz that will be used, in case there is no
-        clear reference frequency present in the Measurement Set. Default is ``230e9``.
+        clear reference frequency present in the Measurement Set. Default is ``None``.
 
         """
 
@@ -432,10 +447,20 @@ class Gridder:
             data = tab.getcol("DATA").T
             uvw = tab.getcol("UVW").T
 
+        spectral_tab = table(str(path / "SPECTRAL_WINDOW"))
+
         try:
-            freq = table(str(path / "SPECTRAL_WINDOW")).getcol("CHAN_FREQ").T
+            ref_frequency = spectral_tab.getcol("CHAN_FREQ")
         except Exception:
-            freq = fallback_frequency
+            if fallback_frequency is not None:
+                ref_frequency = fallback_frequency
+            else:
+                raise ValueError(
+                    "The fallback_frequency may not be None if no "
+                    "reference frequency can be read from the MS."
+                )
+
+        frequency_offsets = spectral_tab.getcol("CHAN_FREQ").ravel() - ref_frequency
 
         uvw = np.repeat(uvw[None], 1, axis=0)
         u_meter = uvw[:, :, 0]
@@ -452,7 +477,8 @@ class Gridder:
             v_meter=v_meter,
             img_size=img_size,
             fov=fov,
-            frequency=freq,
+            ref_frequency=ref_frequency,
+            frequency_offsets=frequency_offsets,
         )
 
         cls.stokes["I"] = GridData(vis_data=stokes_i)
