@@ -91,7 +91,7 @@ def _get_norm(norm: str):
         case "centered":
             return matplotlib.colors.CenteredNorm()
         case "sqrt":
-            return matplotlib.colors.PowerNorm(exp=0.5)
+            return matplotlib.colors.PowerNorm(0.5)
         case _:
             return norm
 
