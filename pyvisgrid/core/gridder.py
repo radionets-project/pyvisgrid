@@ -93,7 +93,7 @@ class Gridder:
         """
 
         self.ref_frequency = ref_frequency
-        self.frequency_offsets = np.asarray(frequency_offsets)[0]
+        self.frequency_offsets = np.asarray(frequency_offsets).ravel()
 
         self.frequencies = self.frequency_offsets + self.ref_frequency
 
