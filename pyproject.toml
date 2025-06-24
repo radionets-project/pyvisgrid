@@ -7,7 +7,11 @@ name = "pyvisgrid"
 dynamic = ["version"]
 description = " Grid and visualize observations of radio interferometers."
 readme = "README.md"
-authors = [{ name = "Kevin Schmitz, Tom Groß, Anno Knierim" }]
+authors = [
+  { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
+  { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
+  { name = "Anno Knierim", email = "anno.knierim@tu-dortmund.de" },
+]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
   { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
@@ -32,9 +36,6 @@ dependencies = [
   "astropy<=6.1.0",
   "click",
   "h5py",
-  "ipython",
-  "jupyter",
-  "matplotlib",
   "numpy",
   "pandas",
   "scipy",
@@ -46,10 +47,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+plot = ["matplotlib"]
 
-tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
-
-dev = ["pre-commit"]
+[dependency-groups]
+tests = [
+  "h5py",
+  "pytest >= 7.0",
+  "pytest-cov",
+  "tomli",
+]
+dev = [
+  "pre-commit",
+  "ipython",
+  "jupyter",
+  {include-group = "tests"},
+]
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
