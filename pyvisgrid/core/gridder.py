@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,7 +9,11 @@ from astropy.constants import c
 from astropy.io import fits
 from casatools.table import table
 from numpy.exceptions import AxisError
-from pyvisgen.simulation import Observation, Visibilities
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyvisgen.simulation import Observation, Visibilities
 
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data

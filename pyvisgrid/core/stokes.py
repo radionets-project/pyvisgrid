@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 import numpy as np
-from pyvisgen.simulation import Visibilities
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyvisgen.simulation import Visibilities
 
 
 def get_stokes_from_vis_data(
