@@ -238,7 +238,7 @@ class Gridder:
         ----------
 
         obs : pyvisgen.simulation.Observation
-        The obeservation which is returned by the
+        The observation which is returned by the
         ``pyvisgen.simulation.vis_loop`` function.
 
         vis_data : pyvisgen.simulation.Visibilities
@@ -519,7 +519,7 @@ class Gridder:
         Default is ``None``, meaning the plot won't be saved.
 
         save_args : dict, optional
-        The additional arugments passed to the ``fig.savefig`` call.
+        The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
 
         fig : matplotlib.figure.Figure | None, optional
@@ -640,7 +640,7 @@ class Gridder:
         Default is ``None``, meaning the plot won't be saved.
 
         save_args : dict, optional
-        The additional arugments passed to the ``fig.savefig`` call.
+        The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
 
         fig : matplotlib.figure.Figure | None, optional
@@ -752,7 +752,7 @@ class Gridder:
         Default is ``None``, meaning the plot won't be saved.
 
         save_args : dict, optional
-        The additional arugments passed to the ``fig.savefig`` call.
+        The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
 
         fig : matplotlib.figure.Figure | None, optional

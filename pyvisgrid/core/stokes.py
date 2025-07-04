@@ -93,7 +93,7 @@ def compute_single_stokes_component(
     stokes_comp_2 : int
         Index of second stokes visibility.
     sign : str
-        Wether to add or substract ``stokes_comp_1`` and ``stokes_comp_2``.
+        Whether to add or subtract ``stokes_comp_1`` and ``stokes_comp_2``.
         Valid values are ``'+'`` or ``'-'``.
 
     Returns

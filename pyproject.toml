@@ -1,13 +1,17 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [project]
 name = "pyvisgrid"
 dynamic = ["version"]
 description = " Grid and visualize observations of radio interferometers."
-readme = "README.md"
-authors = [{ name = "Kevin Schmitz, Tom Groß, Anno Knierim" }]
+readme = "README.rst"
+authors = [
+  { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
+  { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
+  { name = "Anno Knierim", email = "anno.knierim@tu-dortmund.de" },
+]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
   { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
@@ -32,30 +36,46 @@ dependencies = [
   "astropy<=6.1.0",
   "click",
   "h5py",
-  "ipython",
-  "jupyter",
-  "matplotlib",
   "numpy",
   "pandas",
+  "matplotlib",
   "scipy",
   "toml",
   "torch",
   "tqdm",
   "casatools",
-  "pyvisgen@git+https://github.com/radionets-project/pyvisgen#egg=main",
+  "pyvisgen@git+https://github.com/radionets-project/pyvisgen.git@main",
 ]
 
-[project.optional-dependencies]
-
-tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
-
-dev = ["pre-commit"]
+[dependency-groups]
+tests = [
+  "h5py",
+  "pytest >= 7.0",
+  "pytest-cov",
+  "tomli",
+]
+dev = [
+  "pre-commit",
+  "ipython",
+  "jupyter",
+  {include-group = "tests"},
+]
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
 
-[tool.setuptools_scm]
-write_to = "pyvisgrid/_version.py"
+[tool.hatch.version]
+source = "vcs"
 
-[tool.setuptools.packages.find]
-where = ["."]
+[tool.hatch.build.hooks.vcs]
+version-file = "pyvisgrid/_version.py"
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+# as long as we still directly install
+# pyvisgen from git we need to set this
+# to true
+[tool.hatch.metadata]
+allow-direct-references = true
