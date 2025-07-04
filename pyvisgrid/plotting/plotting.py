@@ -168,7 +168,7 @@ def plot_ungridded_uv(
     Default is ``None``, meaning the plot won't be saved.
 
     save_args : dict, optional
-    The additional arugments passed to the ``fig.savefig`` call.
+    The additional arguments passed to the ``fig.savefig`` call.
     Default is ``{"bbox_inches":"tight"}``.
 
     fig : matplotlib.figure.Figure | None, optional
@@ -322,7 +322,7 @@ def plot_mask(
     Default is ``None``, meaning the plot won't be saved.
 
     save_args : dict, optional
-    The additional arugments passed to the ``fig.savefig`` call.
+    The additional arguments passed to the ``fig.savefig`` call.
     Default is ``{"bbox_inches":"tight"}``.
 
     fig : matplotlib.figure.Figure | None, optional
@@ -531,7 +531,7 @@ def plot_dirty_image(
     Default is ``None``, meaning the plot won't be saved.
 
     save_args : dict, optional
-    The additional arugments passed to the ``fig.savefig`` call.
+    The additional arguments passed to the ``fig.savefig`` call.
     Default is ``{"bbox_inches":"tight"}``.
 
     fig : matplotlib.figure.Figure | None, optional
