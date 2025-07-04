@@ -95,6 +95,9 @@ class Gridder:
         self.ref_frequency = ref_frequency
         self.frequency_offsets = np.asarray(frequency_offsets).ravel()
 
+        print("ref_frequency", self.ref_frequency)
+        print("offsets", self.frequency_offsets)
+
         self.frequencies = self.frequency_offsets + self.ref_frequency
 
         u_wave = u_meter / c.value
@@ -278,8 +281,8 @@ class Gridder:
             v_meter=v_meter.cpu().numpy(),
             img_size=img_size,
             fov=fov,
-            ref_frequency=obs.ref_frequency,
-            frequency_offsets=obs.frequency_offsets,
+            ref_frequency=obs.ref_frequency.cpu().numpy(),
+            frequency_offsets=np.asarray(obs.frequency_offsets),
         )
 
         if isinstance(stokes_components, str):
