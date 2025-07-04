@@ -38,6 +38,7 @@ dependencies = [
   "h5py",
   "numpy",
   "pandas",
+  "matplotlib",
   "scipy",
   "toml",
   "torch",
@@ -45,9 +46,6 @@ dependencies = [
   "casatools",
   "pyvisgen@git+https://github.com/radionets-project/pyvisgen.git@main",
 ]
-
-[project.optional-dependencies]
-plot = ["matplotlib"]
 
 [dependency-groups]
 tests = [
