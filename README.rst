@@ -40,18 +40,15 @@ of a simulated observation of the protoplanetary disk **Elias 24** from the
 
 The visibilities were generated using ``pyvisgen`` using the ALMA Cylce- -9 configuration and gridded using ``pyvisgrid``.
 
-.. figure:: ./assets/elias24_example_model.png
-	:height: 300px
-	:align: center
-
+.. image:: ./assets/elias24_example_model.png
+	:width: 49.5%
 	
-	Model input of the simulation
+Model input of the simulation
 
-.. figure:: ./assets/elias24_example_ungridded_uv.png
-	:height: 300px
-	:align: center
+.. image:: ./assets/elias24_example_ungridded_uv.png
+	:width: 49.5%
 	
-	Ungridded :math:`(u,v)` coverage of the simulated observation
+Ungridded :math:`(u,v)` coverage of the simulated observation
 
 
 .. |mask_abs| image:: ./assets/elias24_example_mask_abs.png
@@ -60,13 +57,11 @@ The visibilities were generated using ``pyvisgen`` using the ALMA Cylce- -9 conf
 .. |mask_phase| image:: ./assets/elias24_example_mask_phase.png
 	:width: 49.5%
 
-.. class:: center
 
 |mask_abs| |mask_phase|
-*Amplitude (left) and Phase (right) of the gridded visibilities*
+Amplitude (left) and Phase (right) of the gridded visibilities
 
-.. figure:: ./assets/elias24_example_dirty_image.png
-	:height: 300px
-	:align: center
+.. image:: ./assets/elias24_example_dirty_image.png
+	:width: 49.5%
 	
-	Dirty image created from the simulated :math:`(u,v)` coverage.
+Dirty image created from the simulated :math:`(u,v)` coverage.
