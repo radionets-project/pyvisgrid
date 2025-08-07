@@ -1,4 +1,4 @@
-def test_fits_gridding_SI():
+def test_ms_gridding_SI():
     import shutil
 
     import h5py

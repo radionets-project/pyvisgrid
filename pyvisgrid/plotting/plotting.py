@@ -206,6 +206,8 @@ def plot_ungridded_uv(
 
     ax.scatter(x=np.append(-u, u), y=np.append(-v, v), s=marker_size, **plot_args)
 
+    ax.axis("equal")
+
     ax.set_xlabel(f"$u$ in {unit}")
     ax.set_ylabel(f"$v$ in {unit}")
 

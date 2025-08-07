@@ -284,7 +284,7 @@ class Gridder:
             v_meter=v_meter.cpu().numpy(),
             img_size=img_size,
             fov=fov,
-            ref_frequency=obs.ref_frequency,
+            ref_frequency=obs.ref_frequency.cpu().numpy(),
             frequency_offsets=obs.frequency_offsets,
         )
 
@@ -406,7 +406,9 @@ class Gridder:
         img_size: int,
         fov: float,
         desc_id: int | None = None,
-        fallback_frequency: float | None = None,
+        ref_frequency_id: int = 0,
+        use_calibrated: bool = False,
+        filter_flagged: bool = True,
     ):
         """
         Initializes the Gridder with a measurement which is saved in an
@@ -430,9 +432,16 @@ class Gridder:
         This can be used to choose the component of a composite observation.
         Default is ``None``, which means that all observations will be used.
 
-        fallback_frequency: float | None, optional
-        The reference frequency in Hertz that will be used, in case there is no
-        clear reference frequency present in the Measurement Set. Default is ``None``.
+        ref_frequency_id: int, optional
+        The index of the reference frequency that will be used if the measurement
+        is a composite observation and no desc_id is given.
+
+        use_calibrated: bool, optional
+        Whether to use the calibrated data from the MODEL_DATA column or the raw data
+        from the DATA column. Default is ``True``.
+
+        filter_flagged: bool, optional
+        Whether to filter out flagged data rows. Default is ``True``.
 
         """
 
@@ -445,34 +454,62 @@ class Gridder:
 
         tab = table(str(path))
 
+        data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
+
         if desc_id is not None:
             mask = tab.getcol("DATA_DESC_ID") == desc_id
-            data = tab.getcol("DATA")[:, :, mask].T
-            uvw = tab.getcol("UVW")[:, mask].T
+            mask_idx = np.argwhere(mask).ravel()
+
+            nrow = mask_idx[-1] - mask_idx[0] + 1
+
+            data = tab.getcolslice(
+                data_colname,
+                blc=[0, 0],
+                trc=[-1, -1],
+                incr=[1, 1],
+                startrow=mask_idx[0],
+                nrow=nrow,
+            )
+            data = data[..., mask_idx - mask_idx[0]]
+
+            uvw = tab.getcolslice(
+                "UVW", blc=[0], trc=[1], incr=[1], startrow=mask_idx[0], nrow=nrow
+            )
+            uvw = uvw[..., mask_idx - mask_idx[0]]
         else:
-            data = tab.getcol("DATA").T
-            uvw = tab.getcol("UVW").T
+            data = tab.getcol(data_colname)
+            uvw = tab.getcol("UVW")[:2]
 
         spectral_tab = table(str(path / "SPECTRAL_WINDOW"))
 
-        try:
-            ref_frequency = spectral_tab.getcol("CHAN_FREQ")
-        except Exception:
-            if fallback_frequency is not None:
-                ref_frequency = fallback_frequency
-            else:
-                raise ValueError(
-                    "The fallback_frequency may not be None if no "
-                    "reference frequency can be read from the MS."
-                )
+        if desc_id is not None:
+            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", desc_id)
+        else:
+            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", 0)
 
-        frequency_offsets = spectral_tab.getcol("CHAN_FREQ").ravel() - ref_frequency
+        if desc_id is not None:
+            frequency_offsets = (
+                spectral_tab.getcell("CHAN_FREQ", desc_id) - ref_frequency
+            )
+        else:
+            frequency_offsets = spectral_tab.getcell("CHAN_FREQ", 0) - ref_frequency
 
-        uvw = np.repeat(uvw[None], 1, axis=0)
-        u_meter = uvw[:, :, 0]
-        v_meter = uvw[:, :, 1]
+        if filter_flagged:
+            flag_mask = tab.getcol("FLAG")[..., mask]
+            flag_mask = flag_mask.reshape((-1, flag_mask.shape[-1])).astype(np.uint8)
+            flag_mask = np.prod(flag_mask, axis=0)
 
-        stokes_i = data[:, :, 0] + data[:, :, 1]
+            flag_mask = np.logical_not(flag_mask.astype(bool))
+        else:
+            flag_mask = np.ones(uvw.shape[-1]).astype(bool)
+
+        uvw = uvw[..., flag_mask]
+        data = data[..., flag_mask]
+
+        u_meter = uvw[0]
+        v_meter = uvw[1]
+
+        stokes_i = data[0] + data[1]
 
         # FIXME: probably some kind of difference in normalization.
         # Factor 0.5 fixes this for now. Has to be investigated.
@@ -487,7 +524,7 @@ class Gridder:
             frequency_offsets=frequency_offsets,
         )
 
-        cls.stokes["I"] = GridData(vis_data=stokes_i)
+        cls.stokes["I"] = GridData(vis_data=stokes_i.ravel())
 
         return cls
 
