@@ -477,6 +477,7 @@ class Gridder:
             )
             uvw = uvw[..., mask_idx - mask_idx[0]]
         else:
+            mask = np.ones_like(tab.getcol("DATA_DESC_ID")).astype(bool)
             data = tab.getcol(data_colname)
             uvw = tab.getcol("UVW")[:2]
 
