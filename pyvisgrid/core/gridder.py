@@ -203,15 +203,15 @@ class Gridder:
         mask[mask == 0] = 1
 
         mask_real, _, _ = np.histogram2d(
-            u_wave_full,
-            v_wave_full,
+            x=u_wave_full,
+            y=v_wave_full,
             bins=[bins, bins],
             weights=stokes_real_full,
             density=False,
         )
         mask_imag, _, _ = np.histogram2d(
-            u_wave_full,
-            v_wave_full,
+            x=u_wave_full,
+            y=v_wave_full,
             bins=[bins, bins],
             weights=stokes_imag_full,
             density=False,
@@ -737,14 +737,22 @@ class Gridder:
 
         Default is ``real``.
 
-        crop : tuple[list[float | None]], optional
-        The crop of the image. This has to have the format
-        ``([x_left, x_right], [y_left, y_right])``, where the left and right
-        values for each axis are the upper and lower limits of the axes which
-        should be shown.
-        IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
-        via the ``plot_args`` parameter, this will be the scale in which one
-        has to give the crop! If not, the crop has to be in pixels.
+        ax_unit: str | astropy.units.unit, optional
+        The unit in which to show the ticks of the x and y-axes in.
+        The y-axis is the Declination (DEC) and the x-axis is the Right Ascension (RA).
+        The latter one is defined as increasing from left to right!
+        The unit has to be given as a string or an ``astropy.units.Unit``.
+        The string must correspond to the string representation of an ``astropy.units.Unit``.
+
+        Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree`` etc..
+        Default is ``pixel``.
+
+        center_pos: tuple | None, optional
+        The coordinate center of the image. The coordinates have to
+        be given in the unit defined in the parameter ``ax_unit`` above.
+        If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
+        Default is ``None``, meaning the coordinates of the axes will be
+        given as relative.
 
         norm : str | matplotlib.colors.Normalize | None, optional
         The name of the norm or a matplotlib norm.
