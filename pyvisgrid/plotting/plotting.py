@@ -2,6 +2,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+import warnings
+
+import astropy.units as units
+
 
 def _configure_axes(
     fig: matplotlib.figure.Figure | None,
@@ -206,7 +210,7 @@ def plot_ungridded_uv(
 
     ax.scatter(x=np.append(-u, u), y=np.append(-v, v), s=marker_size, **plot_args)
 
-    ax.axis("equal")
+    ax.set_aspect("equal", "box")
 
     ax.set_xlabel(f"$u$ in {unit}")
     ax.set_ylabel(f"$v$ in {unit}")
@@ -439,7 +443,8 @@ def plot_mask(
 def plot_dirty_image(
     grid_data,
     mode: str = "real",
-    crop: tuple[list[float | None]] = ([None, None], [None, None]),
+    ax_unit: str | units.Unit = "pixel",
+    center_pos: tuple[float] | None = None,
     norm: str | matplotlib.colors.Normalize = None,
     colorbar_shrink: float = 1,
     cmap: str | matplotlib.colors.Colormap | None = "inferno",
@@ -464,7 +469,6 @@ def plot_dirty_image(
 
     mode : str, optional
     The mode specifying which values of the mask should be plotted.
-
     Possible values are:
 
     - ``real``:     Plots the real part of the dirty image.
@@ -475,14 +479,22 @@ def plot_dirty_image(
 
     Default is ``real``.
 
-    crop : tuple[list[float | None]], optional
-    The crop of the image. This has to have the format
-    ``([x_left, x_right], [y_left, y_right])``, where the left and right
-    values for each axis are the upper and lower limits of the axes which
-    should be shown.
-    IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
-    via the ``plot_args`` parameter, this will be the scale in which one
-    has to give the crop! If not, the crop has to be in pixels.
+    ax_unit: str | astropy.units.unit, optional
+    The unit in which to show the ticks of the x and y-axes in.
+    The y-axis is the Declination (DEC) and the x-axis is the Right Ascension (RA).
+    The latter one is defined as increasing from left to right!
+    The unit has to be given as a string or an ``astropy.units.Unit``.
+    The string must correspond to the string representation of an ``astropy.units.Unit``.
+
+    Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree`` etc..
+    Default is ``pixel``.
+
+    center_pos: tuple | None, optional
+    The coordinate center of the image. The coordinates have to
+    be given in the unit defined in the parameter ``ax_unit`` above.
+    If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
+    Default is ``None``, meaning the coordinates of the axes will be
+    given as relative.
 
     norm : str | matplotlib.colors.Normalize | None, optional
     The name of the norm or a matplotlib norm.
@@ -571,18 +583,50 @@ def plot_dirty_image(
                 "The given mode does not exist! Valid modes are: real, imag, abs"
             )
 
+    unit = units.Unit(ax_unit)
+
+    if unit.physical_type == "angle":
+        img_size = dirty_image.shape[0]
+        cell_size = grid_data.fov / img_size
+
+        extent = (
+            np.array([-img_size / 2, img_size / 2] * 2) * cell_size * units.arcsecond
+        ).to(unit)
+
+        if center_pos is not None:
+            center_pos = np.array(center_pos) * unit
+            extent[:2] += center_pos[0]
+            extent[2:] += center_pos[1]
+            label_prefix = ""
+        else:
+            label_prefix = "Relative "
+
+        ax.set_xlabel(f"{label_prefix}RA in {unit}")
+        ax.set_ylabel(f"{label_prefix}DEC in {unit}")
+
+        extent = extent.value
+
+    else:
+        if unit != units.pixel:
+            warnings.warn(
+                f"The given unit {unit} is no angle unit! Using pixels instead."
+            )
+
+        extent = None
+
+        ax.set_xlabel("Pixels")
+        ax.set_ylabel("Pixels")
+
     im = ax.imshow(
         dirty_image,
         norm=norm,
         origin="lower",
         interpolation="none",
         cmap=cmap,
+        extent=extent,
         **plot_args,
     )
     fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density in Jy/px")
-
-    ax.set_xlabel("Pixels")
-    ax.set_ylabel("Pixels")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)

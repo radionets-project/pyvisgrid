@@ -25,11 +25,14 @@ class GridData:
     DataClass to save the gridded and non-gridded visibilities for a
     specific Stokes component.
 
-    Parameters
+    Attributes
     ----------
 
     vis_data : numpy.ndarray
     The ungridded visibilities.
+
+    fov : float
+    The size of the Field Of View of the gridded data in arcseconds.
 
     mask : numpy.ndarray, optional
     The mask created from the given (u,v) coordinates. The mask contains
@@ -48,6 +51,7 @@ class GridData:
     """
 
     vis_data: numpy.ndarray
+    fov: float | None = None
     mask: numpy.ndarray | None = None
     mask_real: numpy.ndarray | None = None
     mask_imag: numpy.ndarray | None = None
@@ -219,6 +223,7 @@ class Gridder:
         mask_real /= mask
         mask_imag /= mask
 
+        grid_data.fov = self.fov
         grid_data.mask = mask
         grid_data.mask_real = mask_real
         grid_data.mask_imag = mask_imag
