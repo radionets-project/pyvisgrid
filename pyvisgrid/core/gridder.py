@@ -460,22 +460,12 @@ class Gridder:
             mask = tab.getcol("DATA_DESC_ID") == desc_id
             mask_idx = np.argwhere(mask).ravel()
 
-            nrow = mask_idx[-1] - mask_idx[0] + 1
+            tab_subset = tab.selectrows(rownrs=mask_idx)
 
-            data = tab.getcolslice(
-                data_colname,
-                blc=[0, 0],
-                trc=[-1, -1],
-                incr=[1, 1],
-                startrow=mask_idx[0],
-                nrow=nrow,
-            )
-            data = data[..., mask_idx - mask_idx[0]]
+            data = tab_subset.getcol("DATA")
 
-            uvw = tab.getcolslice(
-                "UVW", blc=[0], trc=[1], incr=[1], startrow=mask_idx[0], nrow=nrow
-            )
-            uvw = uvw[..., mask_idx - mask_idx[0]]
+            uvw = tab_subset.getcol("UVW")
+
         else:
             mask = np.ones_like(tab.getcol("DATA_DESC_ID")).astype(bool)
             data = tab.getcol(data_colname)
