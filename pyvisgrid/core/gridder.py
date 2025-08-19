@@ -191,8 +191,11 @@ class Gridder:
         )
 
         mask, *_ = np.histogram2d(
-            u_wave_full, v_wave_full, bins=[bins, bins], density=False
+            x=u_wave_full, y=v_wave_full, bins=[bins, bins], density=False
         )
+        mask = (
+            mask.T
+        )  # u (x) is histogrammed along the first dimension (rows) --> transpose
         mask[mask == 0] = 1
 
         mask_real, _, _ = np.histogram2d(
@@ -209,6 +212,10 @@ class Gridder:
             weights=stokes_imag_full,
             density=False,
         )
+
+        mask_real = mask_real.T  # see above
+        mask_imag = mask_imag.T  # see above
+
         mask_real /= mask
         mask_imag /= mask
 
@@ -462,14 +469,13 @@ class Gridder:
 
             tab_subset = tab.selectrows(rownrs=mask_idx)
 
-            data = tab_subset.getcol("DATA")
-
-            uvw = tab_subset.getcol("UVW")
+            data = tab_subset.getcol(data_colname)
+            uv = tab_subset.getcol("UVW")[:2]
 
         else:
             mask = np.ones_like(tab.getcol("DATA_DESC_ID")).astype(bool)
             data = tab.getcol(data_colname)
-            uvw = tab.getcol("UVW")[:2]
+            uv = tab.getcol("UVW")[:2]
 
         spectral_tab = table(str(path / "SPECTRAL_WINDOW"))
 
@@ -492,13 +498,13 @@ class Gridder:
 
             flag_mask = np.logical_not(flag_mask.astype(bool))
         else:
-            flag_mask = np.ones(uvw.shape[-1]).astype(bool)
+            flag_mask = np.ones(uv.shape[-1]).astype(bool)
 
-        uvw = uvw[..., flag_mask]
+        uv = uv[..., flag_mask]
         data = data[..., flag_mask]
 
-        u_meter = uvw[0]
-        v_meter = uvw[1]
+        u_meter = uv[0]
+        v_meter = uv[1]
 
         stokes_i = data[0] + data[1]
 
