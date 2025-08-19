@@ -40,12 +40,6 @@ of a simulated observation of the protoplanetary disk **Elias 24** from the
 
 The visibilities were generated using ``pyvisgen`` using the ALMA Cylce- -9 configuration and gridded using ``pyvisgrid``.
 
-Model input of the simulation
------------------------------
-
-.. image:: ./assets/elias24_example_model.png
-	:width: 49.5%
-
 Ungridded :math:`(u,v)` coverage of the simulated observation
 -------------------------------------------------------------
 
@@ -68,4 +62,10 @@ Dirty image created from the simulated :math:`(u,v)` coverage.
 --------------------------------------------------------------
 
 .. image:: ./assets/elias24_example_dirty_image.png
+	:width: 49.5%
+
+Clean image from ALMA composite measurement
+-------------------------------------------
+
+.. image:: ./assets/elias24_example_model.png
 	:width: 49.5%
