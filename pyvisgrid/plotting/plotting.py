@@ -1,10 +1,9 @@
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-
 import warnings
 
 import astropy.units as units
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def _configure_axes(

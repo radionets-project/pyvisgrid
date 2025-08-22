@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
-from numpy.typing import ArrayLike
-
 from astropy.constants import c
 from astropy.io import fits
 from casatools.table import table
 from numpy.exceptions import AxisError
-
-from typing import TYPE_CHECKING
+from numpy.typing import ArrayLike
 
 if TYPE_CHECKING:
     from pyvisgen.simulation import Observation, Visibilities
