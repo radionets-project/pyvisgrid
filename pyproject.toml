@@ -48,23 +48,11 @@ dependencies = [
 
 [project.optional-dependencies]
 
-pyvisgen = [
-  "pyvisgen"
-]
+pyvisgen = ["pyvisgen"]
 
 [dependency-groups]
-tests = [
-  "h5py",
-  "pytest >= 7.0",
-  "pytest-cov",
-  "tomli",
-]
-dev = [
-  "pre-commit",
-  "ipython",
-  "jupyter",
-  {include-group = "tests"},
-]
+tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
+dev = ["pre-commit", "ipython", "jupyter", { include-group = "tests" }]
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
@@ -78,9 +66,3 @@ version-file = "pyvisgrid/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
-
-# as long as we still directly install
-# pyvisgen from git we need to set this
-# to true
-[tool.hatch.metadata]
-allow-direct-references = true
