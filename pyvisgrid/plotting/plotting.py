@@ -379,8 +379,9 @@ def plot_mask(
                 im, ax=ax, shrink=colorbar_shrink, label="$(u,v)$ per frequel in 1/fq"
             )
         case "abs":
+            mask_abs, _ = grid_data.get_mask_abs_phase()
             im = ax.imshow(
-                np.abs(grid_data.mask_real + 1j * grid_data.mask_imag),
+                mask_abs,
                 norm=norm,
                 origin="lower",
                 interpolation="none",
@@ -389,8 +390,9 @@ def plot_mask(
             )
             fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Amplitude in a.u.")
         case "phase":
+            _, mask_phase = grid_data.get_mask_abs_phase()
             im = ax.imshow(
-                np.angle(grid_data.mask_real + 1j * grid_data.mask_imag),
+                mask_phase,
                 norm=norm,
                 origin="lower",
                 interpolation="none",
