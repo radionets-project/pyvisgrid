@@ -47,23 +47,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-pyvisgen = [
-  "pyvisgen"
-]
+pyvisgen = ["pyvisgen"]
+
 
 [dependency-groups]
-tests = [
-  "h5py",
-  "pytest >= 7.0",
-  "pytest-cov",
-  "tomli",
-]
-dev = [
-  "pre-commit",
-  "ipython",
-  "jupyter",
-  {include-group = "tests"},
-]
+tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
+dev = ["pre-commit", "ipython", "jupyter", { include-group = "tests" }]
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
