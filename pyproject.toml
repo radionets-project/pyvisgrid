@@ -47,8 +47,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-
 pyvisgen = ["pyvisgen"]
+
 
 [dependency-groups]
 tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
@@ -63,6 +63,34 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "pyvisgrid/_version.py"
 
-
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+include = ["pyvisgrid"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = ["tests", "examples"]
+
+[tool.ruff.lint]
+extend-select = [
+  "I",  # isort
+  "E", # pycodestyle
+  "F", # Pyflakes
+  "UP", # pyupgrade
+  "B", # flake8-bugbear
+  "SIM", # flake8-simplify
+]
+ignore = ["B905"]
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyvisgrid"]
