@@ -33,21 +33,21 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-  "astropy<=6.1.0",
-  "click",
-  "h5py",
-  "numpy",
-  "pandas",
-  "matplotlib",
-  "scipy",
-  "toml",
-  "torch",
-  "tqdm",
-  "casatools",
+    "astropy>=6.1.0",
+    "click>=8.2.1",
+    "h5py>=3.14.0",
+    "matplotlib>=3.10.5",
+    "numpy>=2.2.6",
+    "pandas>=2.3.2",
+    "scipy>=1.15.3",
+    "toml>=0.10.2",
+    "torch>=2.8.0",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
 pyvisgen = ["pyvisgen"]
+casa = ["casatools"]
 
 
 [dependency-groups]
@@ -61,15 +61,18 @@ repository = "https://github.com/radionets-project/pyvisgrid"
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "pyvisgrid/_version.py"
+version-file = "src/pyvisgrid/_version.py"
 
 [tool.hatch.build.targets.wheel]
-include = ["pyvisgrid"]
+include = ["src/pyvisgrid"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/pyvisgrid" = "pyvisgrid"
 
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-extend-exclude = ["tests", "examples"]
+extend-exclude = ["tests"]
 
 [tool.ruff.lint]
 extend-select = [
