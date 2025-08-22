@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy
 import numpy as np
+from numpy.typing import ArrayLike
+
 from astropy.constants import c
 from astropy.io import fits
 from casatools.table import table
@@ -50,12 +51,12 @@ class GridData:
 
     """
 
-    vis_data: numpy.ndarray
+    vis_data: np.ndarray
     fov: float | None = None
-    mask: numpy.ndarray | None = None
-    mask_real: numpy.ndarray | None = None
-    mask_imag: numpy.ndarray | None = None
-    dirty_image: numpy.ndarray | None = None
+    mask: np.ndarray | None = None
+    mask_real: np.ndarray | None = None
+    mask_imag: np.ndarray | None = None
+    dirty_image: np.ndarray | None = None
 
     def __str__(self):
         return self.__dict__
@@ -64,12 +65,12 @@ class GridData:
 class Gridder:
     def __init__(
         self,
-        u_meter: numpy.ndarray,
-        v_meter: numpy.ndarray,
+        u_meter: np.ndarray,
+        v_meter: np.ndarray,
         img_size: int,
         fov: float,
         ref_frequency: float,
-        frequency_offsets: numpy.typing.ArrayLike,
+        frequency_offsets: ArrayLike,
     ):
         """
 
