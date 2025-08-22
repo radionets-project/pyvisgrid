@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import numpy as np
-
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 if TYPE_CHECKING:
     from pyvisgen.simulation import Visibilities
@@ -11,33 +11,27 @@ if TYPE_CHECKING:
 def get_stokes_from_vis_data(
     vis_data: Visibilities, stokes_comp: str, polarization: str
 ):
-    """
-    Get the Stokes visibility for a given Stokes component
+    """Get the Stokes visibility for a given Stokes component
     depending on polarization.
 
     Parameters
     ----------
-
     vis_data : pyvisgen.simulation.Visibilities
-    The Visibilities which are the output of the ``pyvisgen.simulation.vis_loop``
-    function.
-
+        The Visibilities which are the output of the ``pyvisgen.simulation.vis_loop``
+        function.
     stokes_comp : str
-    The name of the Stokes component which should be returned.
-    Valid names are: ``'I'``, ``'Q'``, ``'U'``, ``'V'``, ``'I+V'``,
-    ``'Q+U'``, ``'Q-U'``, ``'I-V'``.
-
+        The name of the Stokes component which should be returned.
+        Valid names are: ``'I'``, ``'Q'``, ``'U'``, ``'V'``, ``'I+V'``,
+        ``'Q+U'``, ``'Q-U'``, ``'I-V'``.
     polarization : str
-    The type of polarization which should be considered.
-    Valid values are: ``'circular'`` and any value. In case this is not set to
-    ``'circular'``, the result will be the same for all other values.
+        The type of polarization which should be considered.
+        Valid values are: ``'circular'`` and any value. In case this is not set to
+        ``'circular'``, the result will be the same for all other values.
 
     Returns
     -------
-
     numpy.ndarray:
-    The Stokes visibility of the given Stokes component with the given polarization.
-
+        The Stokes visibility of the given Stokes component with the given polarization.
     """
     if polarization == "circular":
         match stokes_comp:
@@ -85,8 +79,7 @@ def compute_single_stokes_component(
     stokes_comp_2: int,
     sign: str,
 ):
-    """
-    Computes single stokes components I, Q, U, or V from visibility
+    """Computes single stokes components I, Q, U, or V from visibility
     data for gridding.
 
     Parameters
@@ -104,10 +97,8 @@ def compute_single_stokes_component(
 
     Returns
     -------
-
     numpy.ndarray
-    The visibilities for the specified Stokes component.
-
+        The visibilities for the specified Stokes component.
     """
     if sign not in "+-":
         raise ValueError("'sign' can only be '+' or '-'!")
