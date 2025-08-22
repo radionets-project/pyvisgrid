@@ -7,9 +7,15 @@ from typing import TYPE_CHECKING
 import numpy as np
 from astropy.constants import c
 from astropy.io import fits
-from casatools.table import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
+
+try:
+    from casatools.table import table
+
+    CASA_AVAIL = True
+except ModuleNotFoundError:
+    CASA_AVAIL = False
 
 if TYPE_CHECKING:
     from pyvisgen.simulation import Observation, Visibilities
@@ -446,6 +452,12 @@ class Gridder:
         filter_flagged: bool, optional
             Whether to filter out flagged data rows. Default is ``True``.
         """
+        if not CASA_AVAIL:
+            raise ModuleNotFoundError(
+                "Cannot import casatools. Please make sure "
+                "you installed pyvisgrid with the optional "
+                "casa dependency (uv pip install 'pyvisgrid[casa]')!"
+            )
 
         path = Path(path)
 
