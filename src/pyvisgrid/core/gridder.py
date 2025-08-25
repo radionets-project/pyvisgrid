@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
 
+__all__ = ["GridData", "Gridder"]
+
 
 @dataclass
 class GridData:
