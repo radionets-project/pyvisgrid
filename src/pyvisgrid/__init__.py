@@ -1,3 +1,5 @@
 from pyvisgrid.core.gridder import GridData, Gridder
 
-__all__ = ["Gridder", "GridData"]
+from .version import __version__
+
+__all__ = ["__version__", "Gridder", "GridData"]
