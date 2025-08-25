@@ -18,7 +18,6 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
-    "sphinxcontrib.bibtex",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
     "IPython.sphinxext.ipython_console_highlighting",
