@@ -248,7 +248,7 @@ class Gridder:
         return self[stokes_component]
 
     @classmethod
-    def from_pyvisgen(
+    def pyvisgen(
         cls,
         vis_data: Visibilities,
         obs: Observation,
@@ -339,7 +339,7 @@ class Gridder:
         return cls
 
     @classmethod
-    def from_fits(
+    def fits(
         cls,
         path: str,
         img_size: int,
@@ -417,7 +417,7 @@ class Gridder:
         return cls
 
     @classmethod
-    def from_ms(
+    def ms(
         cls,
         path: str,
         img_size: int,
