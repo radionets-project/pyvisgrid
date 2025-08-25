@@ -7,6 +7,8 @@ import numpy as np
 if TYPE_CHECKING:
     from pyvisgen.simulation import Visibilities
 
+__all__ = ["compute_single_stokes_component", "get_stokes_from_vis_data"]
+
 
 def get_stokes_from_vis_data(
     vis_data: Visibilities, stokes_comp: str, polarization: str
