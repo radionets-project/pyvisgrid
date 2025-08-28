@@ -116,6 +116,9 @@ def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
 def plot_ungridded_uv(
     gridder,
     mode: str = "wave",
+    show_times: bool = True,
+    time_cmap: str | matplotlib.colors.Colormap = "inferno",
+    colorbar_shrink: float = 1.0,
     marker_size: float | None = None,
     plot_args: dict = None,
     fig_args: dict = None,
@@ -136,6 +139,13 @@ def plot_ungridded_uv(
         plotted in units of the reference wavelength, or ``meter``,
         meaning the (u,v) coordinates will be plotted in meter.
         Default is ``wave``.
+    times_cmap: str | matplotlib.colors.Colormap, optional
+        The colormap to be used for the time component of the plot.
+        Default is ``'inferno'``.
+    colorbar_shrink: float, optional
+        The shrink parameter of the colorbar. This can be needed if the plot is
+        included as a subplot to adjust the size of the colorbar.
+        Default is ``1``, meaning original scale.
     marker_size : float | None, optional
         The size of the scatter markers in points**2.
         Default is ``None``, meaning the default value supplied by
@@ -171,7 +181,7 @@ def plot_ungridded_uv(
         The axes object.
     """
     if plot_args is None:
-        plot_args = dict(color="royalblue")
+        plot_args = dict(color="royalblue") if not show_times else dict()
 
     if fig_args is None:
         fig_args = {}
@@ -193,7 +203,17 @@ def plot_ungridded_uv(
                 "The given mode does not exist! Valid modes are: wave, meter."
             )
 
-    ax.scatter(x=np.append(-u, u), y=np.append(-v, v), s=marker_size, **plot_args)
+    scat = ax.scatter(
+        x=np.append(-u, u),
+        y=np.append(-v, v),
+        c=np.tile(gridder.times, reps=2) if show_times else None,
+        s=marker_size,
+        cmap=time_cmap if show_times else None,
+        **plot_args,
+    )
+
+    if show_times:
+        fig.colorbar(scat, ax=ax, shrink=colorbar_shrink, label="Times in MJD")
 
     ax.set_aspect("equal", "box")
 
@@ -427,7 +447,7 @@ def plot_dirty_image(
     center_pos: tuple[float] | None = None,
     norm: str | matplotlib.colors.Normalize = None,
     colorbar_shrink: float = 1,
-    cmap: str | matplotlib.colors.Colormap | None = "inferno",
+    cmap: str | matplotlib.colors.Colormap = "inferno",
     plot_args: dict = None,
     fig_args: dict = None,
     save_to: str | None = None,
@@ -501,10 +521,9 @@ def plot_dirty_image(
         The shrink parameter of the colorbar. This can be needed if the plot is
         included as a subplot to adjust the size of the colorbar.
         Default is ``1``, meaning original scale.
-    cmap: str | matplotlib.colors.Colormap | None, optional
+    cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the plot.
-        Default is ``None``, meaning the colormap will be default to a value
-        fitting for the chosen mode.
+        Default is ``'inferno'``.
     plot_args : dict, optional
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.

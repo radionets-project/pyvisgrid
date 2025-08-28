@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from astropy.constants import c
 from astropy.io import fits
+from astropy.time import Time
 from casatools.table import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
@@ -89,6 +90,7 @@ class Gridder:
         self,
         u_meter: np.ndarray,
         v_meter: np.ndarray,
+        times: np.ndarray,
         img_size: int,
         fov: float,
         ref_frequency: float,
@@ -130,6 +132,8 @@ class Gridder:
 
         self.u_meter = u_meter
         self.v_meter = v_meter
+
+        self.times = np.tile(times, reps=self.frequencies.size)
 
         self.img_size = img_size
 
@@ -281,6 +285,8 @@ class Gridder:
         u_meter = vis_data.u
         v_meter = vis_data.v
 
+        times = obs.baselines.time / 3600 / 24
+
         vis_data = vis_data.get_values()
 
         if vis_data.ndim != 7:
@@ -295,6 +301,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter.cpu().numpy(),
             v_meter=v_meter.cpu().numpy(),
+            times=times,
             img_size=img_size,
             fov=fov,
             ref_frequency=obs.ref_frequency.cpu().numpy(),
@@ -363,12 +370,6 @@ class Gridder:
             uv_colnames = dict(u=None, v=None)
 
         path = Path(path)
-
-        if not path.is_file() or path.suffix.lower() != ".fits":
-            raise FileNotFoundError(
-                f"The file {path} is not valid! You have to select a valid .fits file!"
-            )
-
         file = fits.open(path)
 
         data = file[0].data.T
@@ -391,6 +392,8 @@ class Gridder:
             u_meter = data[uv_colnames[0]].T * c.value
             v_meter = data[uv_colnames[1]].T * c.value
 
+        times = Time(data["DATE"], format="jd").mjd
+
         vis = file[0].data["DATA"]
         stokes_i = (
             (vis[..., 0, 0] + 1j * vis[..., 0, 1])
@@ -400,6 +403,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
+            times=times,
             img_size=img_size,
             fov=fov,
             ref_frequency=file[0].header["CRVAL4"],
@@ -466,11 +470,13 @@ class Gridder:
 
             data = tab_subset.getcol(data_colname)
             uv = tab_subset.getcol("UVW")[:2]
+            times = tab_subset.getcol("TIME")
 
         else:
             mask = np.ones_like(tab.getcol("DATA_DESC_ID")).astype(bool)
             data = tab.getcol(data_colname)
             uv = tab.getcol("UVW")[:2]
+            times = tab.getcol("TIME")
 
         spectral_tab = table(str(path / "SPECTRAL_WINDOW"))
 
@@ -510,6 +516,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
+            times=Time(times / 3600 / 24, format="mjd").mjd,
             img_size=img_size,
             fov=fov,
             ref_frequency=ref_frequency,
