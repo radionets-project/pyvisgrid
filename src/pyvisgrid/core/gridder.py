@@ -7,15 +7,23 @@ from typing import TYPE_CHECKING
 import numpy as np
 from astropy.constants import c
 from astropy.io import fits
-from casatools.table import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
+
+try:
+    from casatools.table import table
+
+    CASA_AVAIL = True
+except ModuleNotFoundError:
+    CASA_AVAIL = False
 
 if TYPE_CHECKING:
     from pyvisgen.simulation import Observation, Visibilities
 
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
+
+__all__ = ["GridData", "Gridder"]
 
 
 @dataclass
@@ -242,7 +250,7 @@ class Gridder:
         return self[stokes_component]
 
     @classmethod
-    def from_pyvisgen(
+    def pyvisgen(
         cls,
         vis_data: Visibilities,
         obs: Observation,
@@ -333,7 +341,7 @@ class Gridder:
         return cls
 
     @classmethod
-    def from_fits(
+    def fits(
         cls,
         path: str,
         img_size: int,
@@ -411,7 +419,7 @@ class Gridder:
         return cls
 
     @classmethod
-    def from_ms(
+    def ms(
         cls,
         path: str,
         img_size: int,
@@ -446,6 +454,12 @@ class Gridder:
         filter_flagged: bool, optional
             Whether to filter out flagged data rows. Default is ``True``.
         """
+        if not CASA_AVAIL:
+            raise ModuleNotFoundError(
+                "Cannot import casatools. Please make sure "
+                "you installed pyvisgrid with the optional "
+                "casa dependency (uv pip install 'pyvisgrid[casa]')!"
+            )
 
         path = Path(path)
 

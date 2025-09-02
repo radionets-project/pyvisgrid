@@ -3,8 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-pyvisgrid/_version_cache.py
-pyvisgrid/_version.py
+_version_cache.py
+_version.py
 
 # C extensions
 *.so
@@ -144,3 +144,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+docs/api
