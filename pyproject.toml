@@ -39,6 +39,7 @@ dependencies = [
     "matplotlib>=3.10.5",
     "numpy>=2.2.6",
     "pandas>=2.3.2",
+    "python-casacore>=3.7.1",
     "scipy>=1.15.3",
     "toml>=0.10.2",
     "torch>=2.8.0",
@@ -47,10 +48,8 @@ dependencies = [
 
 [project.optional-dependencies]
 pyvisgen = ["pyvisgen"]
-casa = ["casatools"]
 all = [
   "pyvisgrid[pyvisgen]",
-  "pyvisgrid[casa]"
 ]
 
 
