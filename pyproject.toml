@@ -43,7 +43,7 @@ dependencies = [
   "toml",
   "torch",
   "tqdm",
-  "casatools",
+  "python-casacore",
 ]
 
 [project.optional-dependencies]
