@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
 
+__all__ = ["GridData", "Gridder"]
+
 
 @dataclass
 class GridData:
@@ -452,7 +454,6 @@ class Gridder:
         filter_flagged: bool, optional
             Whether to filter out flagged data rows. Default is ``True``.
         """
-
         path = Path(path)
 
         if not path.is_dir():

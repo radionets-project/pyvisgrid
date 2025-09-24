@@ -5,6 +5,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+__all__ = ["plot_ungridded_uv", "plot_dirty_image", "plot_mask"]
+
 
 def _configure_axes(
     fig: matplotlib.figure.Figure | None,
