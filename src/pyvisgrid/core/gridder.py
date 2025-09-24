@@ -12,13 +12,6 @@ from casacore.tables import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
 
-try:
-    from casatools.table import table
-
-    CASA_AVAIL = True
-except ModuleNotFoundError:
-    CASA_AVAIL = False
-
 if TYPE_CHECKING:
     from pyvisgen.simulation import Observation, Visibilities
 
@@ -257,7 +250,7 @@ class Gridder:
         return self[stokes_component]
 
     @classmethod
-    def pyvisgen(
+    def from_pyvisgen(
         cls,
         vis_data: Visibilities,
         obs: Observation,
@@ -351,7 +344,7 @@ class Gridder:
         return cls
 
     @classmethod
-    def fits(
+    def from_fits(
         cls,
         path: str,
         img_size: int,
@@ -426,7 +419,7 @@ class Gridder:
         return cls
 
     @classmethod
-    def ms(
+    def from_ms(
         cls,
         path: str,
         img_size: int,
@@ -461,13 +454,6 @@ class Gridder:
         filter_flagged: bool, optional
             Whether to filter out flagged data rows. Default is ``True``.
         """
-        if not CASA_AVAIL:
-            raise ModuleNotFoundError(
-                "Cannot import casatools. Please make sure "
-                "you installed pyvisgrid with the optional "
-                "casa dependency (uv pip install 'pyvisgrid[casa]')!"
-            )
-
         path = Path(path)
 
         if not path.is_dir():
