@@ -20,11 +20,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             install-method: mamba
 
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             install-method: mamba
             extra-args: ["codecov"]
 
@@ -53,14 +53,17 @@ jobs:
           environment-file: environment.yml
           cache-downloads: true
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: Install dependencies
         env:
           PYTHON_VERSION: ${{ matrix.python-version }}
         run: |
           python --version
-          pip install --group dev -e ".[all]"
-          pip freeze
-          pip list
+          uv pip install --upgrade pip
+          uv pip install --group tests -e .
+          uv pip freeze
+          uv pip list
 
       - name: List installed package versions (conda)
         if: matrix.environment-type == 'mamba'
@@ -68,9 +71,43 @@ jobs:
 
       - name: Tests
         run: |
-          pytest -vv --cov --cov-branch --cov-report=xml
+          pytest -vv --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install doc dependencies
+        run: |
+          sudo apt update --yes && sudo apt install --yes git
+          uv pip install --system . -U pip towncrier
+          uv pip install --system . --group docs -e .
+          git describe --tags
+
+      - name: Build docs
+        run: make -C docs html
+
+      - name: Produce Changelog
+        run: |
+          towncrier build --yes --version==0.0.0
