@@ -10,7 +10,7 @@ def test_fits_gridding_SI():
     img_size = model_img.shape[0]
     fov = np.abs(model_fits.header["CDELT1"] * 3600) * img_size
 
-    gridder = Gridder.fits(
+    gridder = Gridder.from_fits(
         path="./tests/data/test_vis_dense.fits", img_size=img_size, fov=fov
     )
     gridder.grid("I")
