@@ -41,7 +41,7 @@ def _configure_axes(
         raise KeyError("The parameters ax and fig have to be both None or not None!")
 
     if ax is None:
-        fig, ax = plt.subplots(layout="constrained", **fig_args)
+        fig, ax = plt.subplots(layout="tight", **fig_args)
 
     return fig, ax
 
@@ -117,9 +117,11 @@ def plot_ungridded_uv(
     gridder,
     mode: str = "wave",
     show_times: bool = True,
+    use_relative_time: bool = True,
     time_cmap: str | matplotlib.colors.Colormap = "inferno",
     colorbar_shrink: float = 1.0,
     marker_size: float | None = None,
+    aspect_args: dict | None = None,
     plot_args: dict = None,
     fig_args: dict = None,
     save_to: str | None = None,
@@ -139,6 +141,13 @@ def plot_ungridded_uv(
         plotted in units of the reference wavelength, or ``meter``,
         meaning the (u,v) coordinates will be plotted in meter.
         Default is ``wave``.
+    show_times : bool, optional
+        Whether to show the timestamps of the measured visibilities
+        as a colormap. Default is ``True``.
+    use_relative_time : bool, optional
+        Whether to show the times relative to the timestamp of the
+        first measurement in hours.
+        Default is ``True``.
     times_cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the time component of the plot.
         Default is ``'inferno'``.
@@ -189,12 +198,15 @@ def plot_ungridded_uv(
     if save_args is None:
         save_args = dict(bbox_inches="tight")
 
+    if aspect_args is None:
+        aspect_args = dict(aspect="equal", adjustable="box")
+
     fig, ax = _configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
     match mode:
         case "wave":
             u, v = gridder.u_wave, gridder.v_wave
-            unit = "$1/\\lambda$"
+            unit = "$\\lambda$"
         case "meter":
             u, v = gridder.u_meter, gridder.v_meter
             unit = "m"
@@ -203,22 +215,30 @@ def plot_ungridded_uv(
                 "The given mode does not exist! Valid modes are: wave, meter."
             )
 
+    times = np.tile(gridder.times.mjd, reps=2) if show_times else None
+    time_unit = "MJD"
+
+    if use_relative_time and show_times:
+        times -= times[0] * 24
+        time_unit = "h"
+
     scat = ax.scatter(
         x=np.append(-u, u),
         y=np.append(-v, v),
-        c=np.tile(gridder.times, reps=2) if show_times else None,
+        c=times,
         s=marker_size,
         cmap=time_cmap if show_times else None,
         **plot_args,
     )
 
     if show_times:
-        fig.colorbar(scat, ax=ax, shrink=colorbar_shrink, label="Times in MJD")
+        fig.colorbar(scat, ax=ax, shrink=colorbar_shrink, label="Time / " + time_unit)
 
-    ax.set_aspect("equal", "box")
+    ax.set_aspect(**aspect_args)
+    scat.set_rasterized(True)
 
-    ax.set_xlabel(f"$u$ in {unit}")
-    ax.set_ylabel(f"$v$ in {unit}")
+    ax.set_xlabel(f"$u$ / {unit}")
+    ax.set_ylabel(f"$v$ / {unit}")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)
@@ -374,7 +394,7 @@ def plot_mask(
                 **plot_args,
             )
             fig.colorbar(
-                im, ax=ax, shrink=colorbar_shrink, label="$(u,v)$ per frequel in 1/fq"
+                im, ax=ax, shrink=colorbar_shrink, label="$(u,v)$ per frequel / 1/fq"
             )
         case "abs":
             mask_abs, _ = grid_data.get_mask_abs_phase()
@@ -386,7 +406,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Amplitude in a.u.")
+            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Amplitude / a.u.")
         case "phase":
             _, mask_phase = grid_data.get_mask_abs_phase()
             im = ax.imshow(
@@ -397,7 +417,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            cbar = fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Phase in rad")
+            cbar = fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Phase / rad")
 
             cbar.set_ticks(np.arange(-np.pi, 3 / 2 * np.pi, np.pi / 2))
             cbar.set_ticklabels(["$-\\pi$", "$-\\pi/2$", "$0$", "$\\pi/2$", "$\\pi$"])
@@ -410,7 +430,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Real Part in a.u.")
+            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Real Part / a.u.")
         case "imag":
             im = ax.imshow(
                 grid_data.mask_imag,
@@ -421,7 +441,7 @@ def plot_mask(
                 **plot_args,
             )
             fig.colorbar(
-                im, ax=ax, shrink=colorbar_shrink, label="Imaginary Part in a.u."
+                im, ax=ax, shrink=colorbar_shrink, label="Imaginary Part / a.u."
             )
         case _:
             raise ValueError(
@@ -586,19 +606,19 @@ def plot_dirty_image(
         cell_size = grid_data.fov / img_size
 
         extent = (
-            np.array([-img_size / 2, img_size / 2] * 2) * cell_size * units.arcsecond
+            np.array([-img_size / 2, img_size / 2] * 2) * cell_size * units.rad
         ).to(unit)
 
         if center_pos is not None:
-            center_pos = np.array(center_pos) * unit
+            center_pos = (np.array(center_pos) * units.degree).to(unit)
             extent[:2] += center_pos[0]
             extent[2:] += center_pos[1]
             label_prefix = ""
         else:
             label_prefix = "Relative "
 
-        ax.set_xlabel(f"{label_prefix}RA in {unit}")
-        ax.set_ylabel(f"{label_prefix}DEC in {unit}")
+        ax.set_xlabel(f"{label_prefix}RA / {unit}")
+        ax.set_ylabel(f"{label_prefix}DEC / {unit}")
 
         extent = extent.value
 
@@ -623,7 +643,8 @@ def plot_dirty_image(
         extent=extent,
         **plot_args,
     )
-    fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density in Jy/px")
+
+    fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)

@@ -8,7 +8,7 @@ import numpy as np
 from astropy.constants import c
 from astropy.io import fits
 from astropy.time import Time
-from casatools.table import table
+from casacore.tables import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
 
@@ -109,6 +109,8 @@ class Gridder:
             The u coordinates in meter.
         v_meter : numpy.ndarray
             The v coordinates in meter.
+        times : numpy.ndarray
+            The times (in MJD) at which the visibilities were measured.
         img_size : int
             The size of the image in pixels.
         fov : float
@@ -133,7 +135,7 @@ class Gridder:
         self.u_meter = u_meter
         self.v_meter = v_meter
 
-        self.times = np.tile(times, reps=self.frequencies.size)
+        self.times = Time(np.tile(times, reps=self.frequencies.size), format="mjd")
 
         self.img_size = img_size
 
@@ -458,56 +460,52 @@ class Gridder:
                 f"This measurement set does not exist under the path {path}"
             )
 
-        tab = table(str(path))
+        main_tab = table(str(path), ack=False)
+        spectral_tab = table(str(path / "SPECTRAL_WINDOW"), ack=False)
 
         data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
 
         if desc_id is not None:
-            mask = tab.getcol("DATA_DESC_ID") == desc_id
+            mask = main_tab.getcol("DATA_DESC_ID") == desc_id
             mask_idx = np.argwhere(mask).ravel()
 
-            tab_subset = tab.selectrows(rownrs=mask_idx)
+            main_tab = main_tab.selectrows(rownrs=mask_idx)
 
-            data = tab_subset.getcol(data_colname)
-            uv = tab_subset.getcol("UVW")[:2]
-            times = tab_subset.getcol("TIME")
+            data = main_tab.getcol(data_colname)
+            uv = main_tab.getcol("UVW")[:, :2]
+            times = main_tab.getcol("TIME")
 
-        else:
-            mask = np.ones_like(tab.getcol("DATA_DESC_ID")).astype(bool)
-            data = tab.getcol(data_colname)
-            uv = tab.getcol("UVW")[:2]
-            times = tab.getcol("TIME")
-
-        spectral_tab = table(str(path / "SPECTRAL_WINDOW"))
-
-        if desc_id is not None:
             ref_frequency = spectral_tab.getcell("REF_FREQUENCY", desc_id)
-        else:
-            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", 0)
-
-        if desc_id is not None:
             frequency_offsets = (
                 spectral_tab.getcell("CHAN_FREQ", desc_id) - ref_frequency
             )
+
         else:
+            mask = np.ones_like(main_tab.getcol("DATA_DESC_ID")).astype(bool)
+            data = main_tab.getcol(data_colname)
+            uv = main_tab.getcol("UVW")[:, :2]
+            times = main_tab.getcol("TIME")
+
+            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", 0)
             frequency_offsets = spectral_tab.getcell("CHAN_FREQ", 0) - ref_frequency
 
         if filter_flagged:
-            flag_mask = tab.getcol("FLAG")[..., mask]
-            flag_mask = flag_mask.reshape((-1, flag_mask.shape[-1])).astype(np.uint8)
+            flag_mask = main_tab.getcol("FLAG")
+            flag_mask = flag_mask.reshape((-1, flag_mask.shape[0])).astype(np.uint8)
             flag_mask = np.prod(flag_mask, axis=0)
 
             flag_mask = np.logical_not(flag_mask.astype(bool))
+
         else:
             flag_mask = np.ones(uv.shape[-1]).astype(bool)
 
-        uv = uv[..., flag_mask]
-        data = data[..., flag_mask]
+        uv = uv[flag_mask]
+        data = data[flag_mask]
 
-        u_meter = uv[0]
-        v_meter = uv[1]
+        u_meter = uv[:, 0]
+        v_meter = uv[:, 1]
 
-        stokes_i = data[0] + data[1]
+        stokes_i = data[..., 0] + data[..., 1]
 
         # FIXME: probably some kind of difference in normalization.
         # Factor 0.5 fixes this for now. Has to be investigated.
@@ -516,7 +514,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
-            times=Time(times / 3600 / 24, format="mjd").mjd,
+            times=Time(times[flag_mask] / 3600 / 24, format="mjd").mjd,
             img_size=img_size,
             fov=fov,
             ref_frequency=ref_frequency,
@@ -532,12 +530,28 @@ class Gridder:
 
         Parameters
         ----------
+        gridder : pyvisgrid.Gridder
+            The gridder from which to take the (u,v) coordinates.
         mode : str, optional
             The mode specifying the scale of the (u,v) coordinates.
             This can be either ``wave``, meaning the coordinates are
             plotted in units of the reference wavelength, or ``meter``,
             meaning the (u,v) coordinates will be plotted in meter.
             Default is ``wave``.
+        show_times : bool, optional
+            Whether to show the timestamps of the measured visibilities
+            as a colormap. Default is ``True``.
+        use_relative_time : bool, optional
+            Whether to show the times relative to the timestamp of the
+            first measurement in hours.
+            Default is ``True``.
+        times_cmap: str | matplotlib.colors.Colormap, optional
+            The colormap to be used for the time component of the plot.
+            Default is ``'inferno'``.
+        colorbar_shrink: float, optional
+            The shrink parameter of the colorbar. This can be needed if the plot is
+            included as a subplot to adjust the size of the colorbar.
+            Default is ``1``, meaning original scale.
         marker_size : float | None, optional
             The size of the scatter markers in points**2.
             Default is ``None``, meaning the default value supplied by
