@@ -497,7 +497,6 @@ def plot_dirty_image(
         - ``abs``:      Plot the absolute value of the dirty image.
 
         Default is ``real``.
-
     ax_unit: str | astropy.units.unit, optional
         The unit in which to show the ticks of the x and y-axes in.
         The y-axis is the Declination (DEC) and the x-axis is the Right Ascension (RA).
@@ -507,8 +506,7 @@ def plot_dirty_image(
         ``astropy.units.Unit``.
 
         Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
-        etc. Default is ``pixel``.
-
+        etc.. Default is ``pixel``.
     center_pos: tuple | None, optional
         The coordinate center of the image. The coordinates have to
         be given in the unit defined in the parameter ``ax_unit`` above.
