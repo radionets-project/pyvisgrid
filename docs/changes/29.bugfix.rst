@@ -1,0 +1,4 @@
+- Downgraded the pinned version for ``numpy`` in ``pyproject.toml`` to avoid potential conflicts.
+- Updated the docstring for the ``vis_data`` attribute in `GridData` to specify its shape for better clarity.
+
+- Improved data selection and masking logic in ``GridData.from_ms`` to ensure correct row selection, flag masking, and shape alignment for measurement and channel data. This also fixes the handling of flagged data and ensures that the returned arrays are correctly filtered and shaped.
