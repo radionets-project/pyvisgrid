@@ -33,24 +33,22 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-    "astropy>=6.1.0",
-    "click>=8.2.1",
-    "h5py>=3.14.0",
-    "matplotlib>=3.10.5",
-    "numpy>=2.2.6",
-    "pandas>=2.3.2",
-    "python-casacore>=3.7.1",
-    "scipy>=1.15.3",
-    "toml>=0.10.2",
-    "torch>=2.8.0",
-    "tqdm>=4.67.1",
+  "astropy>=6.1.0",
+  "click>=8.2.1",
+  "h5py>=3.14.0",
+  "matplotlib>=3.10.5",
+  "numpy>=1.26.0",
+  "pandas>=2.3.2",
+  "python-casacore>=3.7.1",
+  "scipy>=1.15.3",
+  "toml>=0.10.2",
+  "torch>=2.8.0",
+  "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
 pyvisgen = ["pyvisgen"]
-all = [
-  "pyvisgrid[pyvisgen]",
-]
+all = ["pyvisgrid[pyvisgen]"]
 
 
 [dependency-groups]
@@ -92,8 +90,8 @@ dev = [
   "ipython",
   "jupyter",
   "pre-commit",
-  {include-group = "tests"},
-  {include-group = "docs"},
+  { include-group = "tests" },
+  { include-group = "docs" },
 ]
 
 [project.urls]
@@ -121,11 +119,11 @@ extend-exclude = ["tests"]
 
 [tool.ruff.lint]
 extend-select = [
-  "I",  # isort
-  "E", # pycodestyle
-  "F", # Pyflakes
-  "UP", # pyupgrade
-  "B", # flake8-bugbear
+  "I",   # isort
+  "E",   # pycodestyle
+  "F",   # Pyflakes
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
   "SIM", # flake8-simplify
 ]
 ignore = ["B905"]

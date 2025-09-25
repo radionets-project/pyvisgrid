@@ -29,7 +29,7 @@ class GridData:
     Attributes
     ----------
     vis_data : numpy.ndarray
-        The ungridded visibilities.
+        The ungridded visibilities of shape ``(N_MEASUREMENTS * N_CHANNELS,)``.
     fov : float
         The size of the Field Of View of the gridded data in arcseconds.
     mask : numpy.ndarray, optional
@@ -247,7 +247,7 @@ class Gridder:
             np.fft.ifft2(np.fft.fftshift(mask_real + 1j * mask_imag))
         )
 
-        return self[stokes_component]
+        return self.stokes[stokes_component]
 
     @classmethod
     def from_pyvisgen(
@@ -468,13 +468,8 @@ class Gridder:
 
         if desc_id is not None:
             mask = main_tab.getcol("DATA_DESC_ID") == desc_id
-            mask_idx = np.argwhere(mask).ravel()
 
-            main_tab = main_tab.selectrows(rownrs=mask_idx)
-
-            data = main_tab.getcol(data_colname)
-            uv = main_tab.getcol("UVW")[:, :2]
-            times = main_tab.getcol("TIME")
+            main_tab = main_tab.selectrows(rownrs=np.argwhere(mask).ravel())
 
             ref_frequency = spectral_tab.getcell("REF_FREQUENCY", desc_id)
             frequency_offsets = (
@@ -482,31 +477,32 @@ class Gridder:
             )
 
         else:
-            mask = np.ones_like(main_tab.getcol("DATA_DESC_ID")).astype(bool)
-            data = main_tab.getcol(data_colname)
-            uv = main_tab.getcol("UVW")[:, :2]
-            times = main_tab.getcol("TIME")
-
             ref_frequency = spectral_tab.getcell("REF_FREQUENCY", 0)
             frequency_offsets = spectral_tab.getcell("CHAN_FREQ", 0) - ref_frequency
 
+        data = main_tab.getcol(data_colname)
+        uv = main_tab.getcol("UVW")[:, :2]
+        times = main_tab.getcol("TIME")
+
         if filter_flagged:
             flag_mask = main_tab.getcol("FLAG")
-            flag_mask = flag_mask.reshape((-1, flag_mask.shape[0])).astype(np.uint8)
-            flag_mask = np.prod(flag_mask, axis=0)
+            flag_mask = flag_mask.reshape((flag_mask.shape[0], -1)).astype(np.uint8)
+            flag_mask = np.prod(flag_mask, axis=1)
 
             flag_mask = np.logical_not(flag_mask.astype(bool))
 
         else:
-            flag_mask = np.ones(uv.shape[-1]).astype(bool)
+            flag_mask = np.ones(uv.shape[0]).astype(bool)
 
         uv = uv[flag_mask]
         data = data[flag_mask]
+        times = times[flag_mask]
 
         u_meter = uv[:, 0]
         v_meter = uv[:, 1]
 
         stokes_i = data[..., 0] + data[..., 1]
+        stokes_i = stokes_i.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
 
         # FIXME: probably some kind of difference in normalization.
         # Factor 0.5 fixes this for now. Has to be investigated.
@@ -515,7 +511,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
-            times=Time(times[flag_mask] / 3600 / 24, format="mjd").mjd,
+            times=Time(times / 3600 / 24, format="mjd").mjd,
             img_size=img_size,
             fov=fov,
             ref_frequency=ref_frequency,
