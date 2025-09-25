@@ -506,7 +506,7 @@ def plot_dirty_image(
         ``astropy.units.Unit``.
 
         Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
-        etc.. Default is ``pixel``.
+        etc. Default is ``pixel``.
     center_pos: tuple | None, optional
         The coordinate center of the image. The coordinates have to
         be given in the unit defined in the parameter ``ax_unit`` above.

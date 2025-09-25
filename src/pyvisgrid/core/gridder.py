@@ -29,7 +29,7 @@ class GridData:
     Attributes
     ----------
     vis_data : numpy.ndarray
-        The ungridded visibilities in shape ``(N_MEASUREMENTS * N_CHANNELS,)``.
+        The ungridded visibilities of shape ``(N_MEASUREMENTS * N_CHANNELS,)``.
     fov : float
         The size of the Field Of View of the gridded data in arcseconds.
     mask : numpy.ndarray, optional
