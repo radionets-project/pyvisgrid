@@ -1,13 +1,17 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [project]
 name = "pyvisgrid"
 dynamic = ["version"]
 description = " Grid and visualize observations of radio interferometers."
-readme = "README.md"
-authors = [{ name = "Kevin Schmitz, Tom Groß, Anno Knierim" }]
+readme = "README.rst"
+authors = [
+  { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
+  { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
+  { name = "Anno Knierim", email = "anno.knierim@tu-dortmund.de" },
+]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
   { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
@@ -29,33 +33,147 @@ classifiers = [
 requires-python = ">=3.10"
 
 dependencies = [
-  "astropy<=6.1.0",
-  "click",
-  "h5py",
-  "ipython",
-  "jupyter",
-  "matplotlib",
-  "numpy",
-  "pandas",
-  "scipy",
-  "toml",
-  "torch",
-  "tqdm",
-  "casatools",
-  "pyvisgen@git+https://github.com/radionets-project/pyvisgen#egg=main",
+  "astropy>=6.1.0",
+  "click>=8.2.1",
+  "h5py>=3.14.0",
+  "matplotlib>=3.10.5",
+  "numpy>=1.26.0",
+  "pandas>=2.3.2",
+  "python-casacore>=3.7.1",
+  "scipy>=1.15.3",
+  "toml>=0.10.2",
+  "torch>=2.8.0",
+  "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
+pyvisgen = ["pyvisgen"]
+all = ["pyvisgrid[pyvisgen]"]
 
-tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
 
-dev = ["pre-commit"]
+[dependency-groups]
+tests = [
+  "coverage>=7.10.2",
+  "h5py>=3.14.0",
+  "pytest >= 7.0",
+  "pytest-cov>=6.2.1",
+  "pytest-order>=1.3.0",
+  "pytest-xdist>=3.8.0",
+  "restructuredtext-lint>=1.4.0",
+  "tomli>=2.2.1",
+]
+
+docs = [
+  "graphviz",
+  "ipython",
+  "jupyter",
+  "linkify-it-py",
+  "matplotlib",
+  "myst-parser",
+  "nbsphinx",
+  "notebook",
+  "numpydoc",
+  "pydata-sphinx-theme",
+  "sphinx-autobuild",
+  "sphinx-automodapi",
+  "sphinx-changelog",
+  "sphinx-copybutton",
+  "sphinx-design",
+  "sphinx-gallery",
+  "sphinx-tippy",
+  "sphinx-togglebutton",
+  "sphinx",
+  "sphinxcontrib-bibtex",
+]
+
+dev = [
+  "ipython",
+  "jupyter",
+  "pre-commit",
+  { include-group = "tests" },
+  { include-group = "docs" },
+]
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
 
-[tool.setuptools_scm]
-write_to = "pyvisgrid/_version.py"
+[tool.hatch.version]
+source = "vcs"
 
-[tool.setuptools.packages.find]
-where = ["."]
+[tool.hatch.build.hooks.vcs]
+version-file = "src/pyvisgrid/_version.py"
+
+[tool.hatch.build.targets.wheel]
+include = ["src/pyvisgrid"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/pyvisgrid" = "pyvisgrid"
+
+[project.entry-points."pyvisgen.gridding"]
+"pyvisgrid.gridder" = "pyvisgrid.core.gridder:Gridder"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = ["tests"]
+
+[tool.ruff.lint]
+extend-select = [
+  "I",   # isort
+  "E",   # pycodestyle
+  "F",   # Pyflakes
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "SIM", # flake8-simplify
+]
+ignore = ["B905"]
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyvisgrid"]
+
+
+[tool.towncrier]
+    package = "pyvisgrid"
+    directory = "docs/changes"
+    filename = "CHANGES.rst"
+    template = "docs/changes/template.rst"
+    # let towncrier create proper links to the merged PR
+    issue_format = "`#{issue} <https://github.com/radionets-project/pyvisgrid/pull/{issue}>`__"
+
+    [tool.towncrier.fragment.feature]
+        name = "New Features"
+        showcontent = true
+
+    [tool.towncrier.fragment.bugfix]
+        name = "Bug Fixes"
+        showcontent = true
+
+    [tool.towncrier.fragment.api]
+        name = "API Changes"
+        showcontent = true
+
+    [tool.towncrier.fragment.datamodel]
+        name = "Data Model Changes"
+        showcontent = true
+
+    [tool.towncrier.fragment.optimization]
+        name = "Refactoring and Optimization"
+        showcontent = true
+
+    [tool.towncrier.fragment.maintenance]
+        name = "Maintenance"
+        showcontent = true
+
+    [[tool.towncrier.section]]
+        name = ""
+        path = ""
