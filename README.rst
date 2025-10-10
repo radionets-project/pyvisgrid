@@ -77,4 +77,3 @@ Acknowledgment
 ===============
 This research made use of the data provided by the DSHARP:
 Andrews, S. M. et. al, “The Disk Substructures at High Angular Resolution Project (DSHARP). I. Motivation, Sample, Calibration, and Overview”, *The Astrophysical Journal*, vol. 869, no. 2, Art. no. L41, IOP, 2018. doi:`10.3847/2041-8213/aaf741 <https://doi.org/10.3847/2041-8213/aaf741>`_.
-
