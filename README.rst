@@ -35,15 +35,13 @@ You can install the necessary packages in a mamba/conda environment of your choi
 
   $ pip install -e .
 
-We recommend using a conda/mamba environment with ``python`` version ``<=3.11``.
-
-If you want to use features from the NRAO CASAtools package, make sure you are using ``python`` 3.10 or 3.11.
+We recommend using a conda/mamba environment with ``python`` version ``>=3.10``.
 
 Example
 ========
 
 The following images show the different images resulting from the gridding process
-of an observation of the protoplanetary disk ``Elias 24`` of the ALMA Observatory as part of the `DSHARP <https://almascience.eso.org/almadata/lp/DSHARP/>`_.
+of a calibrated observation of the protoplanetary disk ``Elias 24`` of the ALMA Observatory as part of the `DSHARP <https://almascience.eso.org/almadata/lp/DSHARP/>`_.
 
 Ungridded :math:`(u,v)` coverage of the observation
 -------------------------------------------------------------
