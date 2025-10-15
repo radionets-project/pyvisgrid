@@ -38,13 +38,13 @@ You can install the necessary packages in a mamba/conda environment of your choi
 We recommend using a conda/mamba environment with ``python`` version ``>=3.10``.
 
 Example
-========
+=======
 
 The following images show the different images resulting from the gridding process
 of a calibrated observation of the protoplanetary disk ``Elias 24`` of the ALMA Observatory as part of the `DSHARP <https://almascience.eso.org/almadata/lp/DSHARP/>`_.
 
 Ungridded :math:`(u,v)` coverage of the observation
--------------------------------------------------------------
+---------------------------------------------------
 
 .. image:: ./assets/examples/elias24_example_ungridded_uv.png
 	:width: 49.5%
@@ -62,18 +62,18 @@ Amplitude (left) and Phase (right) of the gridded visibilities
 |mask_abs| |mask_phase|
 
 Dirty image created from the :math:`(u,v)` coverage.
---------------------------------------------------------------
+----------------------------------------------------
 
 .. image:: ./assets/examples/elias24_example_dirty_image.png
 	:width: 49.5%
 
 Cleaned image
--------------------------------------------
+-------------
 
 .. image:: ./assets/examples/elias24_example_clean.png
 	:width: 49.5%
 
 Acknowledgment
-===============
+==============
 This research made use of the data provided by the DSHARP:
 Andrews, S. M. et. al, “The Disk Substructures at High Angular Resolution Project (DSHARP). I. Motivation, Sample, Calibration, and Overview”, *The Astrophysical Journal*, vol. 869, no. 2, Art. no. L41, IOP, 2018. doi:`10.3847/2041-8213/aaf741 <https://doi.org/10.3847/2041-8213/aaf741>`_.
