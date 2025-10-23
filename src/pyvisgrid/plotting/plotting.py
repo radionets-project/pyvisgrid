@@ -4,6 +4,7 @@ import astropy.units as units
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from astropy.time import Time
 
 __all__ = ["plot_ungridded_uv", "plot_dirty_image", "plot_mask"]
 
@@ -217,12 +218,17 @@ def plot_ungridded_uv(
                 "The given mode does not exist! Valid modes are: wave, meter."
             )
 
-    times = np.tile(gridder.times.mjd, reps=2) if show_times else None
+    times = Time(
+        np.tile(gridder.times.mjd, reps=2) if show_times else None, format="mjd"
+    )
     time_unit = "MJD"
 
     if use_relative_time and show_times:
-        times -= times[0] * 24
+        times = [time.unix / 3600 for time in times]
+        times -= times[0]
         time_unit = "h"
+    elif not use_relative_time and show_times:
+        times = times.value
 
     scat = ax.scatter(
         x=np.append(-u, u),
