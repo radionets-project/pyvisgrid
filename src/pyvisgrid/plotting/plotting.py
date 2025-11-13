@@ -218,8 +218,8 @@ def plot_ungridded_uv(
                 "The given mode does not exist! Valid modes are: wave, meter."
             )
 
-    times = Time(
-        np.tile(gridder.times.mjd, reps=2) if show_times else None, format="mjd"
+    times = (
+        Time(np.tile(gridder.times.mjd, reps=2), format="mjd") if show_times else None
     )
     time_unit = "MJD"
 
