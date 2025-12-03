@@ -1,0 +1,1 @@
+``pyvisgrid`` is now available on ``conda-forge`` and can be installed via ``mamba`` or ``pixi``
