@@ -29,7 +29,7 @@ pyvisgrid |ci| |pre-commit| |codecov| |pypi| |zenodo| |license|
 Installation
 ============
 
-You can install the necessary packages in a virtual environment of your choice using, e.g., [uv](https://docs.astral.sh/uv/):
+You can install the necessary packages in a virtual environment of your choice using, e.g., `uv <https://docs.astral.sh/uv/>`_:
 
 .. code::
 
@@ -41,7 +41,7 @@ or
 
    $ uv add pyvisgrid
 
-*pyvisgrid* can also be installed via `mamba`/`conda` or [pixi](https://pixi.sh/latest/) through `conda-forge`:
+*pyvisgrid* can also be installed via mamba/conda or `pixi <https://pixi.sh/latest/>`_ through `conda-forge`:
 
 .. code::
 
