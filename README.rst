@@ -29,13 +29,42 @@ pyvisgrid |ci| |pre-commit| |codecov| |pypi| |zenodo| |license|
 Installation
 ============
 
-You can install the necessary packages in a mamba/conda environment of your choice by executing
+You can install the necessary packages in a virtual environment of your choice using, e.g., `uv <https://docs.astral.sh/uv/>`_:
 
 .. code::
 
-  $ pip install -e .
+  $ uv pip install pyvisgrid
 
-We recommend using a conda/mamba environment with ``python`` version ``>=3.10``.
+or
+
+.. code::
+
+   $ uv add pyvisgrid
+
+*pyvisgrid* can also be installed via mamba/conda or `pixi <https://pixi.sh/latest/>`_ through `conda-forge`:
+
+.. code::
+
+   $ mamba install -c conda-forge pyvisgrid
+
+or
+
+.. code::
+
+   $ pixi install pyvisgrid
+
+We recommend using a virtual environment with ``python>=3.10``.
+
+Installation as a Developer
+---------------------------
+
+If you want to contribute as a developer, please fork/clone this repository and install the
+package with its development dependencies as an editable installation:
+
+.. code::
+
+   $ uv pip install --group dev -e .
+
 
 Example
 =======

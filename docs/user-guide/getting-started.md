@@ -67,9 +67,8 @@ pip install pyvisgrid
 
 :::{grid-item-card} Install with [`mamba`][mamba] / `conda`
 
-```{warning}
-pyvisgrid is not yet released on `conda-forge`.
-A release is planned for the future.
+```shell-session
+mamba install -c conda-forge pyvisgrid
 ```
 :::
 
@@ -98,9 +97,8 @@ uv pip install pyvisgrid
 :::{grid-item-card} Install with [`pixi`][pixi]
 
 Never heard of `pixi`? See [the documentation][pixi] for more.
-```{warning}
-pyvisgrid is not yet released on `conda-forge`.
-A release is planned for the future.
+```shell-session
+pixi install pyvisgrid
 ```
 :::
 
