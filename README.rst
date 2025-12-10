@@ -15,7 +15,7 @@ pyvisgrid |ci| |pre-commit| |codecov| |pypi| |conda| |zenodo| |license|
     :alt: pre-commit.ci status
 
 .. |pypi| image:: https://badge.fury.io/py/pyvisgrid.svg
-   :target: https://badge.fury.io/py/pyvisgrid
+   :target: https://pypi.org/project/pyvisgrid/
    :alt: PyPI version
 
 .. |conda| image:: https://img.shields.io/conda/vn/conda-forge/pyvisgrid.svg
