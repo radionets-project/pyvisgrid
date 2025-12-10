@@ -1,6 +1,6 @@
-===============================================================
-pyvisgrid |ci| |pre-commit| |codecov| |pypi| |zenodo| |license|
-===============================================================
+=======================================================================
+pyvisgrid |ci| |pre-commit| |codecov| |pypi| |conda| |zenodo| |license|
+=======================================================================
 
 .. |ci| image:: https://github.com/radionets-project/pyvisgrid/actions/workflows/ci.yml/badge.svg?branch=main
     :target: https://github.com/radionets-project/pyvisgrid/actions/workflows/ci.yml?branch=main
@@ -15,8 +15,12 @@ pyvisgrid |ci| |pre-commit| |codecov| |pypi| |zenodo| |license|
     :alt: pre-commit.ci status
 
 .. |pypi| image:: https://badge.fury.io/py/pyvisgrid.svg
-   :target: https://badge.fury.io/py/pyvisgrid
+   :target: https://pypi.org/project/pyvisgrid/
    :alt: PyPI version
+
+.. |conda| image:: https://img.shields.io/conda/vn/conda-forge/pyvisgrid.svg
+   :target: https://anaconda.org/conda-forge/pyvisgrid
+   :alt: Conda Version
 
 .. |zenodo| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.17201290.svg
    :target: https://doi.org/10.5281/zenodo.17201290
