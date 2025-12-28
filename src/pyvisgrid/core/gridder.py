@@ -11,6 +11,7 @@ from astropy.time import Time
 from casacore.tables import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
+from tqdm.auto import tqdm
 
 if TYPE_CHECKING:
     from pyvisgen.simulation import Observation, Visibilities
@@ -51,10 +52,20 @@ class GridData:
     mask_imag: np.ndarray | None = None
     dirty_image: np.ndarray | None = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__dict__
 
-    def get_mask_complex(self):
+    def copy(self) -> GridData:
+        return GridData(
+            vis_data=self.vis_data,
+            fov=self.fov,
+            mask=self.mask,
+            mask_real=self.mask_real,
+            mask_imag=self.mask_imag,
+            dirty_image=self.dirty_image,
+        )
+
+    def get_mask_complex(self) -> np.ndarray:
         """Returns the gridded mask as a complex array with
         the form ``mask.real + 1j * mask.imag``.
 
@@ -65,7 +76,7 @@ class GridData:
         """
         return self.mask_real + 1j * self.mask_imag
 
-    def get_mask_abs_phase(self):
+    def get_mask_abs_phase(self) -> tuple[np.ndarray]:
         """Returns the gridded mask as amplitude and phase.
 
         Returns
@@ -76,7 +87,7 @@ class GridData:
         mask_complex = self.get_mask_complex()
         return np.abs(mask_complex), np.angle(mask_complex)
 
-    def get_mask_real_imag(self):
+    def get_mask_real_imag(self) -> tuple[np.ndarray]:
         """Returns the gridded mask as real and imaginary parts.
 
         Returns
@@ -85,6 +96,73 @@ class GridData:
             Real and parts of the complex mask.
         """
         return self.mask_real, self.mask_imag
+
+
+class GridDataSeries:
+    def __init__(
+        self,
+        times: np.ndarray,
+        u_wave: np.ndarray,
+        v_wave: np.ndarray,
+        grid_data: GridData,
+        step_size: int,
+        time_cutoff_idx: int | None = None,
+    ):
+        self._times_full: np.ndarray = times
+        self._times_idx: np.ndarray = np.arange(len(self._times_full))[
+            :time_cutoff_idx
+        ][::step_size]
+
+        self._u_wave: np.ndarray = u_wave
+        self._v_wave: np.ndarray = v_wave
+
+        self._grid_data_full: GridData = grid_data
+
+        self._grid_data: list[GridData] = []
+
+        self._iter_idx: int = 0
+
+    def __len__(self):
+        return self._times_idx.size
+
+    def __getitem__(self, i) -> list[np.ndarray, np.ndarray, np.ndarray, GridData]:
+        if not isinstance(i, int):
+            raise TypeError("The index must be an integer!")
+
+        time_idx = self._times_idx[i]
+
+        result = [self._times_full[:time_idx]]
+        result.extend(self.get_uv_step(step=i))
+        result.extend([self._grid_data[i]])
+
+        return result
+
+    def __iter__(self):
+        self._iter_idx = 0
+        return self
+
+    def __next__(self):
+        if self._iter_idx >= len(self):
+            raise StopIteration
+
+        num_result = self[self._iter_idx]
+
+        self._iter_idx += 1
+        return num_result
+
+    def get_uv_step(self, step: int) -> tuple[np.ndarray, np.ndarray]:
+        return (
+            self._u_wave[: self._times_idx[step]],
+            self._v_wave[: self._times_idx[step]],
+        )
+
+    def get_vis_step(self, step: int) -> GridData:
+        grid_data = self._grid_data_full.copy()
+        grid_data.vis_data = grid_data.vis_data[: self._times_idx[step]]
+        return grid_data
+
+    def add_grid_data(self, grid_data: GridData) -> None:
+        self._grid_data.append(grid_data)
 
 
 class Gridder:
@@ -145,10 +223,10 @@ class Gridder:
 
         self.stokes = dict()  # initialize stokes component dictionary
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.__dict__)
 
-    def __getitem__(self, i: str):
+    def __getitem__(self, i: str) -> GridData:
         if not isinstance(i, str):
             raise KeyError(
                 "The provided key has to be a valid Stokes component, i.e. 'I'."
@@ -156,17 +234,23 @@ class Gridder:
 
         return self.stokes[i]
 
-    def grid(self, stokes_component: str = "I"):
-        """Grids given visibility data using the default Gridder for the
-        radionets-project.
+    def _grid(
+        self, grid_data: GridData, u_wave: np.ndarray, v_wave: np.ndarray
+    ) -> GridData:
+        """Internal method that grids given visibility data using the default Gridder
+        for the radionets-project.
 
         Parameters
         ----------
-        stokes_component : str, optional
-            The stokes component which should be gridded.
-            The specified component has to be initialized first!
-            Otherwise this will result in a ``KeyError``.
-            Default is ``'I'``.
+        grid_data : GridData
+        The ``GridData`` data object containing the visibilities.
+
+        u_wave: numpy.ndarray
+        The u coordinates in units of wavelength.
+
+        v_wave: numpy.ndarray
+        The v coordinates in units of wavelength.
+
 
         Returns
         -------
@@ -182,20 +266,13 @@ class Gridder:
             of the gridded visibilities.
         """
 
-        if stokes_component not in self.stokes:
-            raise KeyError(
-                f"The Stokes component {stokes_component} has not been initialized!"
-            )
-
-        grid_data = self.stokes[stokes_component]
-
         stokes = grid_data.vis_data
 
         real = stokes.real.T
         imag = stokes.imag.T
 
-        u_wave_full = np.append(-self.u_wave.ravel(), self.u_wave.ravel())
-        v_wave_full = np.append(-self.v_wave.ravel(), self.v_wave.ravel())
+        u_wave_full = np.append(-u_wave.ravel(), u_wave.ravel())
+        v_wave_full = np.append(-v_wave.ravel(), v_wave.ravel())
         stokes_real_full = np.append(real.ravel(), real.ravel())
         stokes_imag_full = np.append(-imag.ravel(), imag.ravel())
 
@@ -247,7 +324,73 @@ class Gridder:
             np.fft.ifft2(np.fft.fftshift(mask_real + 1j * mask_imag))
         )
 
-        return self.stokes[stokes_component]
+        return grid_data
+
+    def grid(self, stokes_component: str = "I") -> GridData:
+        """Grids given visibility data using the default Gridder for the
+        radionets-project.
+
+        Parameters
+        ----------
+        stokes_component : str, optional
+            The stokes component which should be gridded.
+            The specified component has to be initialized first!
+            Otherwise this will result in a ``KeyError``.
+            Default is ``'I'``.
+
+        Returns
+        -------
+        mask : numpy.ndarray, optional
+            The mask created from the given (u,v) coordinates. The mask contains
+            the number of (u,v) coordinates per pixel.
+        mask_real : numpy.ndarray, optional
+            The gridded real part of the visibilites.
+        mask_imag : numpy.ndarray, optional
+            The gridded imaginary part of the visibilities.
+        dirty_img_complex : numpy.ndarray, optional
+            The complex Dirty Image. This is the 2-dimensional Fourier transform
+            of the gridded visibilities.
+        """
+
+        if stokes_component not in self.stokes:
+            raise KeyError(
+                f"The Stokes component {stokes_component} has not been initialized!"
+            )
+
+        return self._grid(
+            grid_data=self.stokes[stokes_component],
+            u_wave=self.u_wave,
+            v_wave=self.v_wave,
+        )
+
+    def grid_time_series(
+        self,
+        step_size: int,
+        time_cutoff_idx: int | None = None,
+        stokes_component: str = "I",
+    ) -> GridDataSeries:
+        grid_data = self.stokes[stokes_component]
+        grid_data_series = GridDataSeries(
+            times=self.times.mjd,
+            u_wave=self.u_wave,
+            v_wave=self.v_wave,
+            grid_data=grid_data,
+            step_size=step_size,
+            time_cutoff_idx=time_cutoff_idx,
+        )
+
+        for idx in tqdm(np.arange(len(grid_data_series)), desc="Gridding time series"):
+            u_wave, v_wave = grid_data_series.get_uv_step(step=idx)
+
+            grid_data_series.add_grid_data(
+                grid_data=self._grid(
+                    grid_data=grid_data_series.get_vis_step(step=idx),
+                    u_wave=u_wave,
+                    v_wave=v_wave,
+                )
+            )
+
+        return grid_data_series
 
     @classmethod
     def from_pyvisgen(
@@ -289,7 +432,12 @@ class Gridder:
         u_meter = vis_data.u
         v_meter = vis_data.v
 
-        times = obs.baselines.time / 3600 / 24
+        times = Time(
+            obs.baselines.get_valid_subset(
+                num_baselines=obs.num_baselines, device="cpu"
+            ).date,
+            format="jd",
+        ).mjd
 
         vis_data = vis_data.get_values()
 
@@ -584,7 +732,17 @@ class Gridder:
             The axes object.
         """
 
-        return plotting.plot_ungridded_uv(self, **kwargs)
+        if "mode" not in kwargs:
+            kwargs["mode"] = "wave"
+
+        if kwargs["mode"] == "wave":
+            u = self.u_wave
+            v = self.v_wave
+        else:
+            u = self.u_meter
+            v = self.v_meter
+
+        return plotting.plot_ungridded_uv(u=u, v=v, times=self.times.mjd, **kwargs)
 
     def plot_mask(self, stokes_component: str = "I", **kwargs):
         """Plots the (u,v) mask (the binned visibilities) of the gridded

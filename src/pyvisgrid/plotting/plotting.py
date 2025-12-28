@@ -117,7 +117,9 @@ def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
 
 
 def plot_ungridded_uv(
-    gridder,
+    u: np.ndarray,
+    v: np.ndarray,
+    times: np.ndarray,
     mode: str = "wave",
     show_times: bool = True,
     use_relative_time: bool = True,
@@ -191,6 +193,8 @@ def plot_ungridded_uv(
         The figure object.
     ax : matplotlib.axes.Axes
         The axes object.
+    scat : matplotlib.collections.PathCollection
+        The artist object.
     """
     if plot_args is None:
         plot_args = dict(color="royalblue") if not show_times else dict()
@@ -208,19 +212,15 @@ def plot_ungridded_uv(
 
     match mode:
         case "wave":
-            u, v = gridder.u_wave, gridder.v_wave
             unit = "$\\lambda$"
         case "meter":
-            u, v = gridder.u_meter, gridder.v_meter
             unit = "m"
         case _:
             raise ValueError(
                 "The given mode does not exist! Valid modes are: wave, meter."
             )
 
-    times = (
-        Time(np.tile(gridder.times.mjd, reps=2), format="mjd") if show_times else None
-    )
+    times = Time(np.tile(times, reps=2), format="mjd") if show_times else None
     time_unit = "MJD"
 
     if use_relative_time and show_times:
@@ -251,7 +251,7 @@ def plot_ungridded_uv(
     if save_to is not None:
         fig.savefig(save_to, **save_args)
 
-    return fig, ax
+    return fig, ax, scat
 
 
 def plot_mask(
@@ -367,6 +367,8 @@ def plot_mask(
         The figure object.
     ax : matplotlib.axes.Axes
         The axes object.
+    im : matplotlib.image.AxesImage
+        The artist object.
     """
     if plot_args is None:
         plot_args = {}
@@ -465,7 +467,7 @@ def plot_mask(
     if save_to is not None:
         fig.savefig(save_to, **save_args)
 
-    return fig, ax
+    return fig, ax, im
 
 
 def plot_dirty_image(
@@ -550,14 +552,14 @@ def plot_dirty_image(
     cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the plot.
         Default is ``'inferno'``.
-    plot_args : dict, optional
+    plot_args : dict | None, optional
         The additional arguments passed to the scatter plot.
-        Default is ``{"color":"royalblue"}``.
-    fig_args : dict, optional
+        Default is ``None``.
+    fig_args : dict | None, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
-        Default is ``{}``.
+        Default is ``None``.
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
@@ -579,6 +581,8 @@ def plot_dirty_image(
         The figure object.
     ax : matplotlib.axes.Axes
         The axes object.
+    im : matplotlib.image.AxesImage
+        The artist object.
     """
     if plot_args is None:
         plot_args = {}
@@ -650,9 +654,9 @@ def plot_dirty_image(
         **plot_args,
     )
 
-    fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
+    # fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)
 
-    return fig, ax
+    return fig, ax, im
