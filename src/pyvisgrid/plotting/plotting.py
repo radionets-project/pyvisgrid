@@ -101,8 +101,24 @@ def _get_norm(
     """
     match norm:
         case "log":
+            if vmin == 0:
+                vmin = np.finfo(float).eps
+                warnings.warn(
+                    f"Since the given vmin is 0, the value was set to {vmin}"
+                    " to enable logarithmic normalization.",
+                    stacklevel=1,
+                )
+
             return matplotlib.colors.LogNorm(clip=True, vmin=vmin, vmax=vmax)
         case "log_noclip":
+            if vmin == 0:
+                vmin = np.finfo(float).eps
+                warnings.warn(
+                    f"Since the given vmin is 0, the value was set to {vmin}"
+                    " to enable logarithmic normalization.",
+                    stacklevel=1,
+                )
+
             return matplotlib.colors.LogNorm(clip=False, vmin=vmin, vmax=vmax)
         case "centered":
             if vmin is not None and vmax is not None:

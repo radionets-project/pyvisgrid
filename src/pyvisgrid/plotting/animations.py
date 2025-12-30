@@ -235,6 +235,7 @@ def plot_observation_state(
             "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": True,
+            "axes_fontsize": "x-small",
             "show_times": True,
             "cmap": "viridis",
             "show_cbar": True,
@@ -249,6 +250,7 @@ def plot_observation_state(
             "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": False,
+            "axes_fontsize": "x-small",
             "cmap": "inferno",
             "norm": "sqrt",
             "show_cbar": True,
@@ -262,6 +264,7 @@ def plot_observation_state(
             "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": False,
+            "axes_fontsize": "x-small",
             "cmap": mask_cmaps[0],
             "label": mask_labels[0],
             "norm": mask_norms[0],
@@ -275,6 +278,7 @@ def plot_observation_state(
             "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": False,
+            "axes_fontsize": "x-small",
             "cmap": mask_cmaps[1],
             "label": mask_labels[1],
             "norm": mask_norms[1],
@@ -386,11 +390,23 @@ def plot_observation_state(
                 "Ungridded $(u,v)$", fontsize=axes_options["uv"]["title_fontsize"]
             )
         if axes_options["uv"]["axes_labels"]:
-            ax["uv"].set_xlabel("$u$ / $\\lambda$")
-            ax["uv"].set_ylabel("$v$ / $\\lambda$")
+            ax["uv"].set_xlabel(
+                "$u$ / $\\lambda$", fontsize=axes_options["uv"]["axes_fontsize"]
+            )
+            ax["uv"].set_ylabel(
+                "$v$ / $\\lambda$", fontsize=axes_options["uv"]["axes_fontsize"]
+            )
+
         if not axes_options["uv"]["axes_ticks"]:
             ax["uv"].set_xticks([])
             ax["uv"].set_yticks([])
+        else:
+            ax["uv"].xaxis.set_tick_params(
+                labelsize=axes_options["uv"]["axes_fontsize"]
+            )
+            ax["uv"].yaxis.set_tick_params(
+                labelsize=axes_options["uv"]["axes_fontsize"]
+            )
     else:
         uv_scat = None
 
@@ -413,9 +429,13 @@ def plot_observation_state(
             cmap=axes_options["di"]["cmap"],
             norm=_get_norm(
                 axes_options["di"]["norm"],
-                vmin=vis_data_max.dirty_image.real.min(),
+                vmin=vis_data_max.dirty_image.real[
+                    vis_data_max.dirty_image.real > 0
+                ].min(),
                 vmax=vis_data_max.dirty_image.real.max(),
             ),
+            origin="lower",
+            interpolation="none",
         )
 
         if axes_options["di"]["show_cbar"]:
@@ -438,11 +458,19 @@ def plot_observation_state(
                 "Dirty Image", fontsize=axes_options["di"]["title_fontsize"]
             )
         if axes_options["di"]["axes_labels"]:
-            ax["di"].set_xlabel("Pixels")
-            ax["di"].set_ylabel("Pixels")
+            ax["di"].set_xlabel("Pixels", fontsize=axes_options["di"]["axes_fontsize"])
+            ax["di"].set_ylabel("Pixels", fontsize=axes_options["di"]["axes_fontsize"])
         if not axes_options["di"]["axes_ticks"]:
             ax["di"].set_xticks([])
             ax["di"].set_yticks([])
+        else:
+            ax["di"].xaxis.set_tick_params(
+                labelsize=axes_options["di"]["axes_fontsize"]
+            )
+            ax["di"].yaxis.set_tick_params(
+                labelsize=axes_options["di"]["axes_fontsize"]
+            )
+
     else:
         di_im = None
 
@@ -469,7 +497,7 @@ def plot_observation_state(
 
     def _plot_mask(mask_img, mask_img_max, mask_key):
         if (
-            (mask_key == "mask_hi" and _is_value_in("mask_lo", plot_positions))
+            mask_key == "mask_hi"
             or (mask_key == "mask_lo" and not _is_value_in("mask_hi", plot_positions))
         ) and axes_options[mask_key]["show_title"]:
             ax[mask_key].set_title(
@@ -482,9 +510,11 @@ def plot_observation_state(
             cmap=axes_options[mask_key]["cmap"],
             norm=_get_norm(
                 axes_options[mask_key]["norm"],
-                vmin=mask_img_max.min(),
+                vmin=mask_img_max[mask_img_max > 0].min(),
                 vmax=mask_img_max.max(),
             ),
+            origin="lower",
+            interpolation="none",
         )
 
         if axes_options[mask_key]["show_cbar"]:
@@ -500,11 +530,22 @@ def plot_observation_state(
             )
 
         if axes_options[mask_key]["axes_labels"]:
-            ax[mask_key].set_xlabel("Frequels")
-            ax[mask_key].set_ylabel("Frequels")
+            ax[mask_key].set_xlabel(
+                "Frequels", fontsize=axes_options[mask_key]["axes_fontsize"]
+            )
+            ax[mask_key].set_ylabel(
+                "Frequels", fontsize=axes_options[mask_key]["axes_fontsize"]
+            )
         if not axes_options[mask_key]["axes_ticks"]:
             ax[mask_key].set_xticks([])
             ax[mask_key].set_yticks([])
+        else:
+            ax[mask_key].xaxis.set_tick_params(
+                labelsize=axes_options[mask_key]["axes_fontsize"]
+            )
+            ax[mask_key].yaxis.set_tick_params(
+                labelsize=axes_options[mask_key]["axes_fontsize"]
+            )
 
         return mask
 
@@ -533,7 +574,6 @@ def animate_observation(
     src_ra: float,
     src_dec: float,
     layout: Layout | str,
-    frames: int | None,
     interval: int,
     save_to: PathLike,
     max_values: tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None = None,
@@ -549,8 +589,7 @@ def animate_observation(
     def _progress_func(_i, _n):
         progress_bar.update(1)
 
-    if frames is None:
-        frames = len(series)
+    frames = len(series)
 
     # GridDataSeries[i] = [grid_data, u, v, times]
     init_data = series[1]
