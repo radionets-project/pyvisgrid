@@ -654,7 +654,7 @@ def plot_dirty_image(
         **plot_args,
     )
 
-    # fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
+    fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)

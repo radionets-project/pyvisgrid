@@ -53,7 +53,9 @@ all = ["pyvisgrid[pyvisgen]"]
 
 [dependency-groups]
 
-animations = ["cartopy",
+animations = [
+  "cartopy",
+  "mergedeep",
   #"radionets-radiotools"
 ]
 

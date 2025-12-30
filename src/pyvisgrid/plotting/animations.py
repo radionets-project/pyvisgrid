@@ -1,18 +1,47 @@
+from os import PathLike
+from pathlib import Path
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib as mpl
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units
 from astropy.coordinates import ITRS, SkyCoord
 from astropy.time import Time
 from cartopy.feature.nightshade import Nightshade
+from mergedeep import merge
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from radiotools.layouts import Layout
+from tqdm.auto import tqdm
 
+from pyvisgrid.core import GridData, GridDataSeries
 from pyvisgrid.plotting import _configure_axes
 
-__all__ = ["plot_earth_layout"]
+__all__ = ["plot_earth_layout", "plot_observation_state"]
 
 _default_colors = mpl.colormaps["inferno"].resampled(10).colors
+
+
+def _is_value_in(value: object, lst: list):
+    return value in np.ravel(lst)
+
+
+# based on https://stackoverflow.com/a/18195921 by "bogatron"
+def _configure_colorbar(
+    mappable: mpl.cm.ScalarMappable,
+    ax: mpl.axes.Axes,
+    fig: mpl.figure.Figure,
+    label: str | None,
+    show_ticks: bool,
+) -> mpl.colorbar.Colorbar:
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(mappable, cax=cax, label=label)
+    if not show_ticks:
+        cbar.set_ticks([])
+    return cbar
 
 
 def _times2hours(times: np.ndarray):
@@ -29,6 +58,8 @@ def plot_earth_layout(
     src_ra: float,
     src_dec: float,
     current_time: Time,
+    show_legend: bool = True,
+    show_title: bool = True,
     coastline_width: float = 0.7,
     show_terrain_texture: bool = True,
     show_grid_lines: bool = True,
@@ -74,6 +105,8 @@ def plot_earth_layout(
 
     threshold_original = projection._threshold
 
+    ax.set_title(f"Time: {current_time.iso}")
+
     ax.add_feature(cfeature.OCEAN, zorder=0)
     ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black")
     if show_night_shade:
@@ -111,6 +144,9 @@ def plot_earth_layout(
         marker="*",
     )
 
+    if show_legend:
+        ax.legend()
+
     projection._threshold *= 100
     ax.plot(
         connection_vecs.lon,
@@ -125,11 +161,423 @@ def plot_earth_layout(
     return fig, ax, mosaic_axes
 
 
-#
-# def plot_observation_state(
-#     show_masks: bool = True,
-#     mask_mode: str = "amp_phase",
-#     show_axes_ticks: bool = False,
-#     axes_options: dict | None = None,
-# ):
-#     pass
+def plot_observation_state(
+    vis_data: GridData,
+    u: np.ndarray,
+    v: np.ndarray,
+    times: np.ndarray,
+    src_ra: float,
+    src_dec: float,
+    layout: Layout | str,
+    max_values: tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None = None,
+    uv_max_extension: float = 0.2,
+    plot_positions: list[list[str]] | None = None,
+    dirty_image_mode: str = "real",
+    mask_mode: str = "amp_phase",
+    swap_masks: bool = False,
+    axes_options: dict | None = None,
+):
+    if plot_positions is None:
+        plot_positions = [["mask_hi", "earth", "uv"], ["mask_lo", "earth", "di"]]
+
+    if mask_mode == "amp_phase":
+        mask_cmaps = ("viridis", "RdBu")
+        mask_labels = ("Amplitude / a.u.", "Phase / rad")
+    elif mask_mode == "real_imag":
+        mask_cmaps = ("PiYG", "RdBu")
+        mask_labels = ("Real part / a.u.", "Imaginary part / a.u.")
+    else:
+        raise ValueError("Possible mask_modes: 'amp_phase' or 'real_imag'")
+
+    if swap_masks:
+        mask_cmaps = mask_cmaps[::-1]
+        mask_labels = mask_labels[::-1]
+
+    default_axes_options = {
+        "uv": {
+            "axes_ticks": False,
+            "axes_labels": True,
+            "show_times": True,
+            "cmap": "viridis",
+            "show_cbar": True,
+            "cbar_ticks": True,
+            "cbar_label": True,
+            "color": _default_colors[4],
+            "aspect": "equal",
+        },
+        "di": {
+            "axes_ticks": False,
+            "axes_labels": False,
+            "cmap": "inferno",
+            "show_cbar": True,
+            "cbar_ticks": False,
+            "cbar_label": True,
+            "mode_in_label": True,
+        },
+        "mask_hi": {
+            "axes_ticks": False,
+            "axes_labels": False,
+            "cmap": mask_cmaps[0],
+            "label": mask_labels[0],
+            "show_cbar": True,
+            "cbar_ticks": False,
+            "cbar_label": True,
+        },
+        "mask_lo": {
+            "axes_ticks": False,
+            "axes_labels": False,
+            "cmap": mask_cmaps[1],
+            "label": mask_labels[1],
+            "show_cbar": True,
+            "cbar_ticks": False,
+            "cbar_label": True,
+        },
+        "earth": {
+            "show_legend": True,
+            "show_title": True,
+            "coastline_width": 0.7,
+            "show_terrain_texture": True,
+            "show_night_shade": True,
+            "plot_colors": None,
+        },
+    }
+
+    axes_options = merge({}, default_axes_options, axes_options)
+
+    fig, ax = plt.subplot_mosaic(plot_positions)
+
+    # Set initial values
+
+    u = np.append(-u, u)
+    v = np.append(-v, v)
+
+    # Set maximum values: max_values = [vis_data, u, v, times]
+
+    if max_values is not None and len(max_values != 4):
+        raise ValueError(
+            "The 'max_values' parameter has to have the form "
+            "max_values = [vis_data, u, v, times]."
+        )
+
+    if max_values is not None:
+        vis_data_max = max_values[0]
+        u_max = max_values[1]
+        v_max = max_values[2]
+        times_max = max_values[3]
+    else:
+        vis_data_max = vis_data
+        u_max = u
+        v_max = v
+        times_max = times
+
+    u_max = np.abs(u_max).max() * (1 + uv_max_extension)
+    v_max = np.abs(v_max).max() * (1 + uv_max_extension)
+
+    # Set mask values
+
+    if mask_mode == "amp_phase":
+        mask_imgs = vis_data.get_mask_abs_phase()
+        mask_imgs_max = vis_data_max.get_mask_abs_phase()
+    elif mask_mode == "real_imag":
+        mask_imgs = vis_data.get_mask_real_imag()
+        mask_imgs_max = vis_data_max.get_mask_real_imag()
+
+    if swap_masks:
+        mask_imgs = mask_imgs[::-1]
+        mask_imgs_max = mask_imgs_max[::-1]
+
+    # Plot subplots
+
+    if _is_value_in("uv", plot_positions):
+        if axes_options["uv"]["show_times"]:
+            uv_scat = ax["uv"].scatter(
+                x=u,
+                y=v,
+                c=np.tile(_times2hours(times=times), reps=2),
+                s=0.5,
+                cmap=axes_options["uv"]["cmap"],
+                vmin=times_max.min(),
+                vmax=times_max.max(),
+            )
+
+            if axes_options["uv"]["show_cbar"]:
+                _configure_colorbar(
+                    mappable=uv_scat,
+                    ax=ax["uv"],
+                    fig=fig,
+                    label="Time / h" if axes_options["uv"]["cbar_label"] else None,
+                    show_ticks=axes_options["uv"]["cbar_ticks"],
+                )
+        else:
+            uv_scat = ax["uv"].scatter(
+                x=u, y=v, s=0.5, color=axes_options["uv"]["color"]
+            )
+
+        ax["uv"].set_xlim(-u_max, u_max)
+        ax["uv"].set_ylim(-v_max, v_max)
+
+        ax["uv"].set_aspect(axes_options["uv"]["aspect"])
+
+        if axes_options["uv"]["axes_labels"]:
+            ax["uv"].set_xlabel("$u$ / $\\lambda$")
+            ax["uv"].set_ylabel("$v$ / $\\lambda$")
+        if not axes_options["uv"]["axes_ticks"]:
+            ax["uv"].set_xticks([])
+            ax["uv"].set_yticks([])
+    else:
+        uv_scat = None
+
+    if _is_value_in("di", plot_positions):
+        match dirty_image_mode:
+            case "real":
+                dirty_image = vis_data.dirty_image.real
+            case "imag":
+                dirty_image = vis_data.dirty_image.imag
+            case "abs":
+                dirty_image = np.abs(vis_data.dirty_image)
+            case _:
+                raise ValueError(
+                    "The given dirty image mode does not exist! "
+                    "Valid modes are: real, imag, abs"
+                )
+
+        di_im = ax["di"].imshow(
+            X=dirty_image,
+            cmap=axes_options["di"]["colormap"],
+            vmin=vis_data_max.dirty_image.real.min(),
+            vmax=vis_data_max.dirty_image.real.max(),
+        )
+
+        if axes_options["di"]["show_cbar"]:
+            mode_str = (
+                "" if axes_options["di"]["mode_in_label"] else f" {dirty_image_mode}"
+            )
+            _configure_colorbar(
+                mappable=di_im,
+                ax=ax["di"],
+                fig=fig,
+                label=f"Flux density{mode_str} / Jy/pix"
+                if axes_options["di"]["cbar_label"]
+                else None,
+                show_ticks=axes_options["di"]["cbar_ticks"],
+            )
+
+        if axes_options["di"]["axes_labels"]:
+            ax["di"].set_xlabel("Pixels")
+            ax["di"].set_ylabel("Pixels")
+        if not axes_options["di"]["axes_ticks"]:
+            ax["di"].set_xticks([])
+            ax["di"].set_yticks([])
+    else:
+        di_im = None
+
+    if _is_value_in("earth", plot_positions):
+        plot_earth_layout(
+            layout=layout,
+            src_ra=src_ra,
+            src_dec=src_dec,
+            current_time=Time(times[-1], format="mjd"),
+            show_legend=axes_options["earth"]["show_legend"],
+            show_title=axes_options["earth"]["show_title"],
+            coastline_width=axes_options["earth"]["coastline_width"],
+            show_terrain_texture=axes_options["earth"]["show_terrain_texture"],
+            show_grid_lines=axes_options["earth"]["show_grid_lines"],
+            show_night_shade=axes_options["earth"]["show_night_shade"],
+            plot_colors=axes_options["earth"]["plot_colors"],
+            fig=fig,
+            mosaic_axes=ax,
+            mosaic_axes_key="earth",
+            ax=ax["earth"],
+        )
+
+    def _plot_mask(mask_img, mask_img_max, mask_key):
+        mask = ax[mask_key].imshow(
+            X=mask_img,
+            cmap=axes_options[mask_key]["cmap"],
+            vmin=mask_img_max.min(),
+            vmax=mask_img_max.max(),
+        )
+
+        if axes_options[mask_key]["show_cbar"]:
+            _configure_colorbar(
+                mappable=mask,
+                ax=ax[mask_key],
+                fig=fig,
+                label=axes_options[mask_key]["label"]
+                if axes_options[mask_key]["cbar_label"]
+                else None,
+                show_ticks=axes_options["di"]["cbar_ticks"],
+            )
+
+        if axes_options[mask_key]["axes_labels"]:
+            ax[mask_key].set_xlabel("Frequels")
+            ax[mask_key].set_ylabel("Frequels")
+        if not axes_options[mask_key]["axes_ticks"]:
+            ax[mask_key].set_xticks([])
+            ax[mask_key].set_yticks([])
+
+        return mask
+
+    plots = {
+        "uv": uv_scat,
+        "di": di_im,
+        "earth": _is_value_in("earth", plot_positions),
+        "mask_hi": None,
+        "mask_lo": None,
+    }
+
+    for mask_key, mask_img, mask_img_max in zip(
+        ["mask_hi", "mask_lo"], mask_imgs, mask_imgs_max
+    ):
+        if _is_value_in(mask_key, plot_positions):
+            mask = _plot_mask(
+                mask_img=mask_img, mask_img_max=mask_img_max, mask_key=mask_key
+            )
+            plots[mask_key] = mask
+
+    return fig, ax, plots, axes_options
+
+
+def animate_observation(
+    series: GridDataSeries,
+    src_ra: float,
+    src_dec: float,
+    layout: Layout | str,
+    frames: int | None,
+    interval: int,
+    save_to: PathLike,
+    max_values: tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None = None,
+    uv_max_extension: float = 0.2,
+    plot_positions: list[list[str]] | None = None,
+    mask_mode: str = "amp_phase",
+    swap_masks: bool = False,
+    dirty_image_mode: str = "real",
+    axes_options: dict | None = None,
+    show_progress: bool = True,
+    dpi: int or str = "figure",
+):
+    def _progress_func(_i, _n):
+        progress_bar.update(1)
+
+    if frames is None:
+        frames = len(series)
+
+    # GridDataSeries[i] = [times, u, v, vis_data]
+    init_data = series[1]
+    last_data = series[-1]
+
+    fig, ax, plots, axes_options = plot_observation_state(
+        vis_data=init_data[3],
+        u=init_data[1],
+        v=init_data[2],
+        times=init_data[0],
+        src_ra=src_ra,
+        src_dec=src_dec,
+        layout=layout,
+        max_values=[last_data[3], last_data[1], last_data[2], last_data[0]],
+        uv_max_extension=uv_max_extension,
+        plot_positions=plot_positions,
+        mask_mode=mask_mode,
+        swap_masks=swap_masks,
+        axes=axes_options,
+    )
+
+    def update(frame):
+        times, u, v, vis_data = series[frame]
+
+        # Update uv plot
+
+        uv_scat = plots["uv"]
+
+        if uv_scat is not None:
+            u = np.append(-u, u)
+            v = np.append(-v, v)
+            uv_scat.set_offsets(np.stack([u, v]).T)
+            uv_scat.set_array(np.tile(_times2hours(times=times), reps=2))
+
+        # Update dirty image
+
+        di_im = plots["di"]
+
+        if di_im is not None:
+            match dirty_image_mode:
+                case "real":
+                    dirty_image = vis_data.dirty_image.real
+                case "imag":
+                    dirty_image = vis_data.dirty_image.imag
+                case "abs":
+                    dirty_image = np.abs(vis_data.dirty_image)
+
+            di_im.set_data(dirty_image)
+
+        # Update masks
+
+        if mask_mode == "amp_phase":
+            mask_imgs = vis_data.get_mask_abs_phase()
+        elif mask_mode == "real_imag":
+            mask_imgs = vis_data.get_mask_real_imag()
+
+        if swap_masks:
+            mask_imgs = mask_imgs[::-1]
+
+        mask_hi = plots["mask_hi"]
+
+        if mask_hi is not None:
+            mask_hi.set_data(mask_imgs[0])
+
+        mask_lo = plots["mask_lo"]
+
+        if mask_lo is not None:
+            mask_lo.set_data(mask_imgs[1])
+
+        # Update earth
+
+        if "earth" in plots:
+            current_time = Time(times[-1], format="mjd")
+            plot_earth_layout(
+                layout=layout,
+                src_ra=src_ra,
+                src_dec=src_dec,
+                current_time=current_time,
+                show_legend=axes_options["earth"]["show_legend"],
+                show_title=axes_options["earth"]["show_title"],
+                coastline_width=axes_options["earth"]["coastline_width"],
+                show_terrain_texture=axes_options["earth"]["show_terrain_texture"],
+                show_grid_lines=axes_options["earth"]["show_grid_lines"],
+                show_night_shade=axes_options["earth"]["show_night_shade"],
+                plot_colors=axes_options["earth"]["plot_colors"],
+                fig=fig,
+                mosaic_axes=ax,
+                mosaic_axes_key="earth",
+                ax=ax["earth"],
+            )
+
+        return_vals = []
+        for val in plots.values():
+            if val is not None and not isinstance(val, bool):
+                return_vals.append(val)
+
+        return return_vals
+
+    if isinstance(save_to, str):
+        save_to = Path(save_to)
+
+    writer = None
+    if save_to.suffix.lower() == ".gif":
+        writer = animation.PillowWriter(
+            fps=1 / (interval * 1e-3),
+            bitrate=-1,
+        )
+        writer.setup(fig=fig, outfile=save_to, dpi=dpi)
+
+    ani = animation.FuncAnimation(
+        fig=fig, func=update, frames=frames, blit=False, interval=interval
+    )
+
+    with tqdm(
+        total=frames, desc="Saving animation", disable=not show_progress
+    ) as progress_bar:
+        if writer is None:
+            ani.save(save_to, progress_callback=_progress_func, dpi=dpi)
+        else:
+            ani.save(save_to, progress_callback=_progress_func, writer=writer, dpi=dpi)
