@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from os import PathLike
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -16,10 +19,12 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from radiotools.layouts import Layout
 from tqdm.auto import tqdm
 
-from pyvisgrid.core import GridData, GridDataSeries
-from pyvisgrid.plotting import _configure_axes
+if TYPE_CHECKING:
+    from pyvisgrid.core.gridder import GridData, GridDataSeries
 
-__all__ = ["plot_earth_layout", "plot_observation_state"]
+from pyvisgrid.plotting.plotting import _configure_axes, _get_norm
+
+__all__ = ["plot_earth_layout", "plot_observation_state", "animate_observation"]
 
 _default_colors = mpl.colormaps["inferno"].resampled(10).colors
 
@@ -35,12 +40,18 @@ def _configure_colorbar(
     fig: mpl.figure.Figure,
     label: str | None,
     show_ticks: bool,
+    fontsize: str = "medium",
 ) -> mpl.colorbar.Colorbar:
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(mappable, cax=cax, label=label)
+    cbar = fig.colorbar(mappable, cax=cax)
+    cbar.set_label(label, fontsize=fontsize)
+
     if not show_ticks:
         cbar.set_ticks([])
+    else:
+        cbar.ax.tick_params(labelsize=fontsize)
+
     return cbar
 
 
@@ -59,11 +70,15 @@ def plot_earth_layout(
     src_dec: float,
     current_time: Time,
     show_legend: bool = True,
+    legend_args: dict | None = None,
+    legend_fontsize: str | int = "x-small",
     show_title: bool = True,
+    title_fontsize: str | int = "small",
     coastline_width: float = 0.7,
     show_terrain_texture: bool = True,
     show_grid_lines: bool = True,
     show_night_shade: bool = True,
+    marker_sizes: dict | None = None,
     plot_colors: dict | None = None,
     fig_args: dict | None = None,
     fig: mpl.figure.Figure | None = None,
@@ -72,6 +87,12 @@ def plot_earth_layout(
     ax: mpl.axes.Axes | None = None,
 ) -> tuple[mpl.figure.Figure, mpl.axes.Axes]:
     fig, ax = _configure_axes(fig=fig, ax=ax, fig_args=fig_args)
+
+    if marker_sizes is None:
+        marker_sizes = {
+            "antennas": 13,
+            "source": 150,
+        }
 
     if plot_colors is None:
         colors = {
@@ -105,7 +126,8 @@ def plot_earth_layout(
 
     threshold_original = projection._threshold
 
-    ax.set_title(f"Time: {current_time.iso}")
+    if show_title:
+        ax.set_title(current_time.iso[:-4], fontsize=title_fontsize)
 
     ax.add_feature(cfeature.OCEAN, zorder=0)
     ax.add_feature(cfeature.LAND, zorder=0, edgecolor="black")
@@ -129,30 +151,38 @@ def plot_earth_layout(
         x=antennas.lon,
         y=antennas.lat,
         transform=transform,
-        color=colors[5],
-        s=15,
+        color=colors["antennas"],
+        s=marker_sizes["antennas"],
         label="Antenna positions",
         zorder=2,
     )
     ax.scatter(
         x=src_pos_itrs.lon.deg,
         y=src_pos_itrs.lat.deg,
-        color=colors[-2],
-        s=200,
+        color=colors["source"],
+        s=marker_sizes["source"],
         label="Projected source position",
         zorder=3,
         marker="*",
     )
 
     if show_legend:
-        ax.legend()
+        if legend_args is None:
+            legend_args = {
+                "loc": "center",
+                "bbox_to_anchor": (0.5, -0.12),
+                "fontsize": legend_fontsize,
+                "borderaxespad": 0,
+            }
+
+        ax.legend(**legend_args)
 
     projection._threshold *= 100
     ax.plot(
         connection_vecs.lon,
         connection_vecs.lat,
         transform=transform,
-        color=colors[0],
+        color=colors["connections"],
         linewidth=0.5,
         zorder=1,
     )
@@ -177,24 +207,32 @@ def plot_observation_state(
     swap_masks: bool = False,
     axes_options: dict | None = None,
 ):
+    if axes_options is None:
+        axes_options = {}
+
     if plot_positions is None:
         plot_positions = [["mask_hi", "earth", "uv"], ["mask_lo", "earth", "di"]]
 
     if mask_mode == "amp_phase":
         mask_cmaps = ("viridis", "RdBu")
         mask_labels = ("Amplitude / a.u.", "Phase / rad")
+        mask_norms = ("log", None)
     elif mask_mode == "real_imag":
         mask_cmaps = ("PiYG", "RdBu")
         mask_labels = ("Real part / a.u.", "Imaginary part / a.u.")
+        mask_norms = ("centered", "centered")
     else:
         raise ValueError("Possible mask_modes: 'amp_phase' or 'real_imag'")
 
     if swap_masks:
         mask_cmaps = mask_cmaps[::-1]
         mask_labels = mask_labels[::-1]
+        mask_norms = mask_norms[::-1]
 
     default_axes_options = {
         "uv": {
+            "show_title": True,
+            "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": True,
             "show_times": True,
@@ -202,42 +240,60 @@ def plot_observation_state(
             "show_cbar": True,
             "cbar_ticks": True,
             "cbar_label": True,
+            "cbar_fontsize": "small",
             "color": _default_colors[4],
             "aspect": "equal",
         },
         "di": {
+            "show_title": True,
+            "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": False,
             "cmap": "inferno",
+            "norm": "sqrt",
             "show_cbar": True,
             "cbar_ticks": False,
             "cbar_label": True,
+            "cbar_fontsize": "small",
             "mode_in_label": True,
         },
         "mask_hi": {
+            "show_title": True,
+            "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": False,
             "cmap": mask_cmaps[0],
             "label": mask_labels[0],
+            "norm": mask_norms[0],
             "show_cbar": True,
             "cbar_ticks": False,
             "cbar_label": True,
+            "cbar_fontsize": "small",
         },
         "mask_lo": {
+            "show_title": True,
+            "title_fontsize": "medium",
             "axes_ticks": False,
             "axes_labels": False,
             "cmap": mask_cmaps[1],
             "label": mask_labels[1],
+            "norm": mask_norms[1],
             "show_cbar": True,
             "cbar_ticks": False,
             "cbar_label": True,
+            "cbar_fontsize": "small",
         },
         "earth": {
-            "show_legend": True,
             "show_title": True,
+            "title_fontsize": "small",
+            "show_legend": True,
+            "legend_args": None,
+            "legend_fontsize": "x-small",
             "coastline_width": 0.7,
             "show_terrain_texture": True,
+            "show_grid_lines": True,
             "show_night_shade": True,
+            "marker_sizes": None,
             "plot_colors": None,
         },
     }
@@ -253,7 +309,7 @@ def plot_observation_state(
 
     # Set maximum values: max_values = [vis_data, u, v, times]
 
-    if max_values is not None and len(max_values != 4):
+    if max_values is not None and len(max_values) != 4:
         raise ValueError(
             "The 'max_values' parameter has to have the form "
             "max_values = [vis_data, u, v, times]."
@@ -287,17 +343,23 @@ def plot_observation_state(
         mask_imgs_max = mask_imgs_max[::-1]
 
     # Plot subplots
-
     if _is_value_in("uv", plot_positions):
+        #
+        time_hours = _times2hours(times=times)
+        time_hours -= time_hours.min()
+
+        time_hours_max = _times2hours(times=times_max)
+        time_hours_max -= time_hours_max.min()
+
         if axes_options["uv"]["show_times"]:
             uv_scat = ax["uv"].scatter(
                 x=u,
                 y=v,
-                c=np.tile(_times2hours(times=times), reps=2),
+                c=np.tile(time_hours, reps=2),
                 s=0.5,
                 cmap=axes_options["uv"]["cmap"],
-                vmin=times_max.min(),
-                vmax=times_max.max(),
+                vmin=time_hours_max.min(),
+                vmax=time_hours_max.max(),
             )
 
             if axes_options["uv"]["show_cbar"]:
@@ -307,6 +369,7 @@ def plot_observation_state(
                     fig=fig,
                     label="Time / h" if axes_options["uv"]["cbar_label"] else None,
                     show_ticks=axes_options["uv"]["cbar_ticks"],
+                    fontsize=axes_options["uv"]["cbar_fontsize"],
                 )
         else:
             uv_scat = ax["uv"].scatter(
@@ -318,6 +381,10 @@ def plot_observation_state(
 
         ax["uv"].set_aspect(axes_options["uv"]["aspect"])
 
+        if axes_options["uv"]["show_title"]:
+            ax["uv"].set_title(
+                "Ungridded $(u,v)$", fontsize=axes_options["uv"]["title_fontsize"]
+            )
         if axes_options["uv"]["axes_labels"]:
             ax["uv"].set_xlabel("$u$ / $\\lambda$")
             ax["uv"].set_ylabel("$v$ / $\\lambda$")
@@ -343,9 +410,12 @@ def plot_observation_state(
 
         di_im = ax["di"].imshow(
             X=dirty_image,
-            cmap=axes_options["di"]["colormap"],
-            vmin=vis_data_max.dirty_image.real.min(),
-            vmax=vis_data_max.dirty_image.real.max(),
+            cmap=axes_options["di"]["cmap"],
+            norm=_get_norm(
+                axes_options["di"]["norm"],
+                vmin=vis_data_max.dirty_image.real.min(),
+                vmax=vis_data_max.dirty_image.real.max(),
+            ),
         )
 
         if axes_options["di"]["show_cbar"]:
@@ -360,8 +430,13 @@ def plot_observation_state(
                 if axes_options["di"]["cbar_label"]
                 else None,
                 show_ticks=axes_options["di"]["cbar_ticks"],
+                fontsize=axes_options["di"]["cbar_fontsize"],
             )
 
+        if axes_options["di"]["show_title"]:
+            ax["di"].set_title(
+                "Dirty Image", fontsize=axes_options["di"]["title_fontsize"]
+            )
         if axes_options["di"]["axes_labels"]:
             ax["di"].set_xlabel("Pixels")
             ax["di"].set_ylabel("Pixels")
@@ -378,7 +453,9 @@ def plot_observation_state(
             src_dec=src_dec,
             current_time=Time(times[-1], format="mjd"),
             show_legend=axes_options["earth"]["show_legend"],
+            legend_fontsize=axes_options["earth"]["legend_fontsize"],
             show_title=axes_options["earth"]["show_title"],
+            title_fontsize=axes_options["earth"]["title_fontsize"],
             coastline_width=axes_options["earth"]["coastline_width"],
             show_terrain_texture=axes_options["earth"]["show_terrain_texture"],
             show_grid_lines=axes_options["earth"]["show_grid_lines"],
@@ -391,11 +468,23 @@ def plot_observation_state(
         )
 
     def _plot_mask(mask_img, mask_img_max, mask_key):
+        if (
+            (mask_key == "mask_hi" and _is_value_in("mask_lo", plot_positions))
+            or (mask_key == "mask_lo" and not _is_value_in("mask_hi", plot_positions))
+        ) and axes_options[mask_key]["show_title"]:
+            ax[mask_key].set_title(
+                "Gridded Visibilities",
+                fontsize=axes_options[mask_key]["title_fontsize"],
+            )
+
         mask = ax[mask_key].imshow(
             X=mask_img,
             cmap=axes_options[mask_key]["cmap"],
-            vmin=mask_img_max.min(),
-            vmax=mask_img_max.max(),
+            norm=_get_norm(
+                axes_options[mask_key]["norm"],
+                vmin=mask_img_max.min(),
+                vmax=mask_img_max.max(),
+            ),
         )
 
         if axes_options[mask_key]["show_cbar"]:
@@ -406,7 +495,8 @@ def plot_observation_state(
                 label=axes_options[mask_key]["label"]
                 if axes_options[mask_key]["cbar_label"]
                 else None,
-                show_ticks=axes_options["di"]["cbar_ticks"],
+                show_ticks=axes_options[mask_key]["cbar_ticks"],
+                fontsize=axes_options[mask_key]["cbar_fontsize"],
             )
 
         if axes_options[mask_key]["axes_labels"]:
@@ -462,28 +552,36 @@ def animate_observation(
     if frames is None:
         frames = len(series)
 
-    # GridDataSeries[i] = [times, u, v, vis_data]
+    # GridDataSeries[i] = [grid_data, u, v, times]
     init_data = series[1]
     last_data = series[-1]
 
     fig, ax, plots, axes_options = plot_observation_state(
-        vis_data=init_data[3],
+        vis_data=init_data[0],
         u=init_data[1],
         v=init_data[2],
-        times=init_data[0],
+        times=init_data[3],
         src_ra=src_ra,
         src_dec=src_dec,
         layout=layout,
-        max_values=[last_data[3], last_data[1], last_data[2], last_data[0]],
+        max_values=[last_data[0], last_data[1], last_data[2], last_data[3]],
         uv_max_extension=uv_max_extension,
         plot_positions=plot_positions,
         mask_mode=mask_mode,
         swap_masks=swap_masks,
-        axes=axes_options,
+        axes_options=axes_options,
     )
 
     def update(frame):
-        times, u, v, vis_data = series[frame]
+        return_vals = []
+        for val in plots.values():
+            if val is not None and not isinstance(val, bool):
+                return_vals.append(val)
+
+        if frame == 0:
+            return return_vals
+
+        vis_data, u, v, times = series[frame]
 
         # Update uv plot
 
@@ -551,11 +649,6 @@ def animate_observation(
                 mosaic_axes_key="earth",
                 ax=ax["earth"],
             )
-
-        return_vals = []
-        for val in plots.values():
-            if val is not None and not isinstance(val, bool):
-                return_vals.append(val)
 
         return return_vals
 

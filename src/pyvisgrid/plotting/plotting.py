@@ -49,7 +49,12 @@ def _configure_axes(
     return fig, ax
 
 
-def _get_norm(norm: str):
+def _get_norm(
+    norm: str,
+    vmax: float | None = None,
+    vmin: float | None = None,
+    vcenter: float = 0,
+):
     """Converts a string parameter to a matplotlib norm.
 
     Parameters
@@ -77,6 +82,18 @@ def _get_norm(norm: str):
                             that this could be any value which exists in matplotlib
                             itself.
 
+    vmax : float | None, optional
+        The maximum value of the range to normalize. This might not have an effect
+        for every norm. Default is ``None``.
+
+    vmin : float | None, optional
+        The minimum value of the range to normalize. This might not have an effect
+        for every norm. Default is ``None``.
+
+    vcenter : float | None, optional
+        The central value of the range to normalize. This might not have an effect
+        for every norm. Default is ``0``.
+
     Returns
     -------
     matplotlib.colors.Normalize | str
@@ -84,13 +101,19 @@ def _get_norm(norm: str):
     """
     match norm:
         case "log":
-            return matplotlib.colors.LogNorm(clip=True)
+            return matplotlib.colors.LogNorm(clip=True, vmin=vmin, vmax=vmax)
         case "log_noclip":
-            return matplotlib.colors.LogNorm(clip=False)
+            return matplotlib.colors.LogNorm(clip=False, vmin=vmin, vmax=vmax)
         case "centered":
-            return matplotlib.colors.CenteredNorm()
+            if vmin is not None and vmax is not None:
+                return matplotlib.colors.CenteredNorm(
+                    vcenter=vcenter, halfrange=np.max([np.abs(vmin), np.abs(vmax)])
+                )
+            else:
+                return matplotlib.colors.CenteredNorm(vcenter=vcenter)
+
         case "sqrt":
-            return matplotlib.colors.PowerNorm(0.5)
+            return matplotlib.colors.PowerNorm(0.5, vmin=vmin, vmax=vmax)
         case _:
             return norm
 

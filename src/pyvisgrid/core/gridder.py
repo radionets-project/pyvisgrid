@@ -125,15 +125,15 @@ class GridDataSeries:
     def __len__(self):
         return self._times_idx.size
 
-    def __getitem__(self, i) -> list[np.ndarray, np.ndarray, np.ndarray, GridData]:
+    def __getitem__(self, i) -> list[GridData, np.ndarray, np.ndarray, np.ndarray]:
         if not isinstance(i, int):
             raise TypeError("The index must be an integer!")
 
         time_idx = self._times_idx[i]
 
-        result = [self._times_full[:time_idx]]
+        result = [self._grid_data[i]]
         result.extend(self.get_uv_step(step=i))
-        result.extend([self._grid_data[i]])
+        result.extend([self._times_full[:time_idx]])
 
         return result
 
