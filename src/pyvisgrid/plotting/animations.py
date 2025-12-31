@@ -14,6 +14,7 @@ from astropy import units
 from astropy.coordinates import ITRS, SkyCoord
 from astropy.time import Time
 from cartopy.feature.nightshade import Nightshade
+from matplotlib.ticker import NullFormatter
 from mergedeep import merge
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from radiotools.layouts import Layout
@@ -49,6 +50,8 @@ def _configure_colorbar(
 
     if not show_ticks:
         cbar.set_ticks([])
+        cbar.ax.yaxis.set_major_formatter(NullFormatter())
+        cbar.ax.yaxis.set_minor_formatter(NullFormatter())
     else:
         cbar.ax.tick_params(labelsize=fontsize)
 
@@ -669,7 +672,7 @@ def animate_observation(
 
         # Update earth
 
-        if "earth" in plots:
+        if plots["earth"]:
             current_time = Time(times[-1], format="mjd")
             plot_earth_layout(
                 layout=layout,
