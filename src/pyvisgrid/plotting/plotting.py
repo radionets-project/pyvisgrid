@@ -1,10 +1,19 @@
+from __future__ import annotations
+
 import warnings
+from typing import TYPE_CHECKING
 
 import astropy.units as units
 import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.time import Time
+from matplotlib.ticker import NullFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+if TYPE_CHECKING:
+    from pyvisgrid.core.gridder import Gridder
 
 __all__ = ["plot_ungridded_uv", "plot_dirty_image", "plot_mask"]
 
@@ -155,15 +164,36 @@ def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
     ax.set_ylim(crop[1][0], crop[1][1])
 
 
+# based on https://stackoverflow.com/a/18195921 by "bogatron"
+def _configure_colorbar(
+    mappable: mpl.cm.ScalarMappable,
+    ax: mpl.axes.Axes,
+    fig: mpl.figure.Figure,
+    label: str | None,
+    show_ticks: bool = True,
+    fontsize: str = "medium",
+) -> mpl.colorbar.Colorbar:
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(mappable, cax=cax)
+    cbar.set_label(label, fontsize=fontsize)
+
+    if not show_ticks:
+        cbar.set_ticks([])
+        cbar.ax.yaxis.set_major_formatter(NullFormatter())
+        cbar.ax.yaxis.set_minor_formatter(NullFormatter())
+    else:
+        cbar.ax.tick_params(labelsize=fontsize)
+
+    return cbar
+
+
 def plot_ungridded_uv(
-    u: np.ndarray,
-    v: np.ndarray,
-    times: np.ndarray,
+    gridder: Gridder,
     mode: str = "wave",
     show_times: bool = True,
     use_relative_time: bool = True,
     time_cmap: str | matplotlib.colors.Colormap = "inferno",
-    colorbar_shrink: float = 1.0,
     marker_size: float | None = None,
     aspect_args: dict | None = None,
     plot_args: dict = None,
@@ -195,10 +225,6 @@ def plot_ungridded_uv(
     times_cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the time component of the plot.
         Default is ``'inferno'``.
-    colorbar_shrink: float, optional
-        The shrink parameter of the colorbar. This can be needed if the plot is
-        included as a subplot to adjust the size of the colorbar.
-        Default is ``1``, meaning original scale.
     marker_size : float | None, optional
         The size of the scatter markers in points**2.
         Default is ``None``, meaning the default value supplied by
@@ -251,15 +277,21 @@ def plot_ungridded_uv(
 
     match mode:
         case "wave":
+            u = gridder.u_wave
+            v = gridder.v_wave
             unit = "$\\lambda$"
         case "meter":
+            u = gridder.u_meter
+            v = gridder.v_meter
             unit = "m"
         case _:
             raise ValueError(
                 "The given mode does not exist! Valid modes are: wave, meter."
             )
 
-    times = Time(np.tile(times, reps=2), format="mjd") if show_times else None
+    times = (
+        Time(np.tile(gridder.times.mjd, reps=2), format="mjd") if show_times else None
+    )
     time_unit = "MJD"
 
     if use_relative_time and show_times:
@@ -279,7 +311,7 @@ def plot_ungridded_uv(
     )
 
     if show_times:
-        fig.colorbar(scat, ax=ax, shrink=colorbar_shrink, label="Time / " + time_unit)
+        _configure_colorbar(mappable=scat, ax=ax, fig=fig, label="Time / " + time_unit)
 
     ax.set_aspect(**aspect_args)
     scat.set_rasterized(True)
@@ -290,7 +322,7 @@ def plot_ungridded_uv(
     if save_to is not None:
         fig.savefig(save_to, **save_args)
 
-    return fig, ax, scat
+    return fig, ax
 
 
 def plot_mask(
@@ -298,7 +330,6 @@ def plot_mask(
     mode: str = "hist",
     crop: tuple[list[float | None]] = ([None, None], [None, None]),
     norm: str | matplotlib.colors.Normalize = None,
-    colorbar_shrink: float = 1,
     cmap: str | matplotlib.colors.Colormap | None = None,
     plot_args: dict = None,
     fig_args: dict = None,
@@ -369,10 +400,6 @@ def plot_mask(
                             itself.
 
         Default is ``None``, meaning no norm will be applied.
-    colorbar_shrink: float, optional
-        The shrink parameter of the colorbar. This can be needed if the plot is
-        included as a subplot to adjust the size of the colorbar.
-        Default is ``1``, meaning original scale.
     cmap: str | matplotlib.colors.Colormap | None, optional
         The colormap to be used for the plot.
         Default is ``None``, meaning the colormap will be default to a value
@@ -424,8 +451,8 @@ def plot_mask(
         "hist": "inferno",
         "abs": "viridis",
         "phase": "RdBu",
-        "real": "RdBu",
-        "imag": "RdBu",
+        "real": "PiYG",
+        "imag": "PuOr",
     }
 
     cmap = cmap_dict[mode] if cmap is None else cmap
@@ -442,9 +469,10 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(
-                im, ax=ax, shrink=colorbar_shrink, label="$(u,v)$ per frequel / 1/fq"
+            _configure_colorbar(
+                mappable=im, ax=ax, fig=fig, label="$(u,v)$ per frequel / 1/fq"
             )
+
         case "abs":
             mask_abs, _ = grid_data.get_mask_abs_phase()
             im = ax.imshow(
@@ -455,7 +483,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Amplitude / a.u.")
+            _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Amplitude / a.u.")
         case "phase":
             _, mask_phase = grid_data.get_mask_abs_phase()
             im = ax.imshow(
@@ -466,8 +494,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            cbar = fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Phase / rad")
-
+            cbar = _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Phase / rad")
             cbar.set_ticks(np.arange(-np.pi, 3 / 2 * np.pi, np.pi / 2))
             cbar.set_ticklabels(["$-\\pi$", "$-\\pi/2$", "$0$", "$\\pi/2$", "$\\pi$"])
         case "real":
@@ -479,7 +506,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Real Part / a.u.")
+            _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Real Part / a.u.")
         case "imag":
             im = ax.imshow(
                 grid_data.mask_imag,
@@ -489,9 +516,11 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(
-                im, ax=ax, shrink=colorbar_shrink, label="Imaginary Part / a.u."
+
+            _configure_colorbar(
+                mappable=im, ax=ax, fig=fig, label="Imaginary Part / a.u."
             )
+
         case _:
             raise ValueError(
                 f"The given mode does not exist!"
@@ -506,7 +535,7 @@ def plot_mask(
     if save_to is not None:
         fig.savefig(save_to, **save_args)
 
-    return fig, ax, im
+    return fig, ax
 
 
 def plot_dirty_image(
@@ -693,9 +722,9 @@ def plot_dirty_image(
         **plot_args,
     )
 
-    fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
+    _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Flux Density / Jy/pix")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)
 
-    return fig, ax, im
+    return fig, ax

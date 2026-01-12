@@ -732,17 +732,7 @@ class Gridder:
             The axes object.
         """
 
-        if "mode" not in kwargs:
-            kwargs["mode"] = "wave"
-
-        if kwargs["mode"] == "wave":
-            u = self.u_wave
-            v = self.v_wave
-        else:
-            u = self.u_meter
-            v = self.v_meter
-
-        return plotting.plot_ungridded_uv(u=u, v=v, times=self.times.mjd, **kwargs)
+        return plotting.plot_ungridded_uv(gridder=self, **kwargs)
 
     def plot_mask(self, stokes_component: str = "I", **kwargs):
         """Plots the (u,v) mask (the binned visibilities) of the gridded

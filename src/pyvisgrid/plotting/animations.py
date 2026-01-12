@@ -14,16 +14,14 @@ from astropy import units
 from astropy.coordinates import ITRS, SkyCoord
 from astropy.time import Time
 from cartopy.feature.nightshade import Nightshade
-from matplotlib.ticker import NullFormatter
 from mergedeep import merge
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from radiotools.layouts import Layout
 from tqdm.auto import tqdm
 
 if TYPE_CHECKING:
     from pyvisgrid.core.gridder import GridData, GridDataSeries
 
-from pyvisgrid.plotting.plotting import _configure_axes, _get_norm
+from pyvisgrid.plotting.plotting import _configure_axes, _configure_colorbar, _get_norm
 
 __all__ = ["plot_earth_layout", "plot_observation_state", "animate_observation"]
 
@@ -32,30 +30,6 @@ _default_colors = mpl.colormaps["inferno"].resampled(10).colors
 
 def _is_value_in(value: object, lst: list):
     return value in np.ravel(lst)
-
-
-# based on https://stackoverflow.com/a/18195921 by "bogatron"
-def _configure_colorbar(
-    mappable: mpl.cm.ScalarMappable,
-    ax: mpl.axes.Axes,
-    fig: mpl.figure.Figure,
-    label: str | None,
-    show_ticks: bool,
-    fontsize: str = "medium",
-) -> mpl.colorbar.Colorbar:
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(mappable, cax=cax)
-    cbar.set_label(label, fontsize=fontsize)
-
-    if not show_ticks:
-        cbar.set_ticks([])
-        cbar.ax.yaxis.set_major_formatter(NullFormatter())
-        cbar.ax.yaxis.set_minor_formatter(NullFormatter())
-    else:
-        cbar.ax.tick_params(labelsize=fontsize)
-
-    return cbar
 
 
 def _times2hours(times: np.ndarray):
