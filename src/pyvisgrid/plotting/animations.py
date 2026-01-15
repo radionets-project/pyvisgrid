@@ -214,7 +214,7 @@ def plot_observation_state(
             "axes_labels": True,
             "axes_fontsize": "x-small",
             "show_times": True,
-            "cmap": "viridis",
+            "cmap": "magma",
             "show_cbar": True,
             "cbar_ticks": True,
             "cbar_label": True,

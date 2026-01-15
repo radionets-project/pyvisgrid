@@ -193,7 +193,7 @@ def plot_ungridded_uv(
     mode: str = "wave",
     show_times: bool = True,
     use_relative_time: bool = True,
-    time_cmap: str | matplotlib.colors.Colormap = "inferno",
+    time_cmap: str | matplotlib.colors.Colormap = "magma",
     marker_size: float | None = None,
     aspect_args: dict | None = None,
     plot_args: dict = None,
@@ -492,9 +492,16 @@ def plot_mask(
                 origin="lower",
                 interpolation="none",
                 cmap=cmap,
+                vmin=-np.pi,
+                vmax=np.pi,
                 **plot_args,
             )
-            cbar = _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Phase / rad")
+            cbar = _configure_colorbar(
+                mappable=im,
+                ax=ax,
+                fig=fig,
+                label="Phase / rad",
+            )
             cbar.set_ticks(np.arange(-np.pi, 3 / 2 * np.pi, np.pi / 2))
             cbar.set_ticklabels(["$-\\pi$", "$-\\pi/2$", "$0$", "$\\pi/2$", "$\\pi$"])
         case "real":
