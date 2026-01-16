@@ -14,12 +14,13 @@ from numpy.typing import ArrayLike
 from tqdm.auto import tqdm
 
 if TYPE_CHECKING:
+    import matplotlib
     from pyvisgen.simulation import Observation, Visibilities
 
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
 
-__all__ = ["GridData", "Gridder"]
+__all__ = ["GridData", "Gridder", "GridDataSeries"]
 
 
 @dataclass
@@ -31,15 +32,20 @@ class GridData:
     ----------
     vis_data : numpy.ndarray
         The ungridded visibilities of shape ``(N_MEASUREMENTS * N_CHANNELS,)``.
+
     fov : float
         The size of the Field Of View of the gridded data in arcseconds.
+
     mask : numpy.ndarray, optional
         The mask created from the given (u,v) coordinates. The mask contains
         the number of (u,v) coordinates per pixel.
+
     mask_real : numpy.ndarray, optional
         The gridded real part of the visibilites.
+
     mask_imag : numpy.ndarray, optional
         The gridded imaginary part of the visibilities.
+
     dirty_img : numpy.ndarray, optional
         The complex Dirty Image. This is the 2-dimensional Fourier transform
         of the gridded visibilities.
@@ -99,30 +105,57 @@ class GridData:
 
 
 class GridDataSeries:
+    """DataClass to save the gridded and non-gridded visibilities for a
+    specific Stokes component for different time steps. This enables to
+    create a time series of different steps in an observation.
+
+    Attributes
+    ----------
+
+    grid_data : GridData
+        The GridData of the full observation.
+
+    times : numpy.ndarray
+        The time steps of the observation.
+
+    u_wave : np.ndarray
+        The :math:`u` coordinates as a multiple of the wavelength.
+
+    u_wave : np.ndarray
+        The :math:`v` coordinates as a multiple of the wavelength.
+
+    step_size : int
+        The size of each timestep (how many steps in the observation are
+        in each iteration of the series).
+
+    time_cutoff_idx : int | None, optional
+        The index to stop the series at.
+        Default is ``None``.
+    """
+
     def __init__(
         self,
-        times: np.ndarray,
+        grid_data: GridData,
         u_wave: np.ndarray,
         v_wave: np.ndarray,
-        grid_data: GridData,
+        times: np.ndarray,
         step_size: int,
         time_cutoff_idx: int | None = None,
     ):
+        self._grid_data_full: GridData = grid_data
+        self._grid_data: list[GridData] = []
+
+        self._u_wave: np.ndarray = u_wave
+        self._v_wave: np.ndarray = v_wave
+
         self._times_full: np.ndarray = times
         self._times_idx: np.ndarray = np.arange(len(self._times_full))[
             :time_cutoff_idx
         ][::step_size]
 
-        self._u_wave: np.ndarray = u_wave
-        self._v_wave: np.ndarray = v_wave
-
-        self._grid_data_full: GridData = grid_data
-
-        self._grid_data: list[GridData] = []
-
         self._iter_idx: int = 0
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._times_idx.size
 
     def __getitem__(self, i) -> list[GridData, np.ndarray, np.ndarray, np.ndarray]:
@@ -137,11 +170,11 @@ class GridDataSeries:
 
         return result
 
-    def __iter__(self):
+    def __iter__(self) -> GridDataSeries:
         self._iter_idx = 0
         return self
 
-    def __next__(self):
+    def __next__(self) -> list[GridData, np.ndarray, np.ndarray, np.ndarray]:
         if self._iter_idx >= len(self):
             raise StopIteration
 
@@ -151,17 +184,53 @@ class GridDataSeries:
         return num_result
 
     def get_uv_step(self, step: int) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Returns the ungridded :math:`(u,v)` coordinates for the given timestep.
+
+        Parameters
+        ----------
+        step : int
+            The step index.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]:
+            The :math:`(u,v)` coordinates in the order ``(u, v)``.
+        """
         return (
             self._u_wave[: self._times_idx[step]],
             self._v_wave[: self._times_idx[step]],
         )
 
     def get_vis_step(self, step: int) -> GridData:
+        """
+        Returns the visibility data for the given timestep.
+
+        Parameters
+        ----------
+        step : int
+            The step index.
+
+        Returns
+        -------
+        GridData:
+            The (un)gridded visibility data.
+        """
+
         grid_data = self._grid_data_full.copy()
         grid_data.vis_data = grid_data.vis_data[: self._times_idx[step]]
         return grid_data
 
     def add_grid_data(self, grid_data: GridData) -> None:
+        """
+        Adds the given (un)gridded visibility data to the series.
+
+        Parameters
+        ----------
+
+        grid_data : GridData
+            The data to add to the series.
+        """
         self._grid_data.append(grid_data)
 
 
@@ -186,17 +255,23 @@ class Gridder:
         Parameters
         ----------
         u_meter : numpy.ndarray
+
             The u coordinates in meter.
         v_meter : numpy.ndarray
             The v coordinates in meter.
+
         times : numpy.ndarray
             The times (in MJD) at which the visibilities were measured.
+
         img_size : int
             The size of the image in pixels.
+
         fov : float
-            The physical size of the image in asec.
+            The physical size of the image in arcsec.
+
         ref_frequency : float
             The reference frequency of the data in Hertz.
+
         frequency_offsets : numpy.typing.ArrayLike
             The frequency offsets in Hertz.
         """
@@ -257,10 +332,13 @@ class Gridder:
         mask : numpy.ndarray, optional
             The mask created from the given (u,v) coordinates. The mask contains
             the number of (u,v) coordinates per pixel.
+
         mask_real : numpy.ndarray, optional
             The gridded real part of the visibilites.
+
         mask_imag : numpy.ndarray, optional
             The gridded imaginary part of the visibilities.
+
         dirty_img_complex : numpy.ndarray, optional
             The complex Dirty Image. This is the 2-dimensional Fourier transform
             of the gridded visibilities.
@@ -343,10 +421,13 @@ class Gridder:
         mask : numpy.ndarray, optional
             The mask created from the given (u,v) coordinates. The mask contains
             the number of (u,v) coordinates per pixel.
+
         mask_real : numpy.ndarray, optional
             The gridded real part of the visibilites.
+
         mask_imag : numpy.ndarray, optional
             The gridded imaginary part of the visibilities.
+
         dirty_img_complex : numpy.ndarray, optional
             The complex Dirty Image. This is the 2-dimensional Fourier transform
             of the gridded visibilities.
@@ -371,10 +452,10 @@ class Gridder:
     ) -> GridDataSeries:
         grid_data = self.stokes[stokes_component]
         grid_data_series = GridDataSeries(
-            times=self.times.mjd,
+            grid_data=grid_data,
             u_wave=self.u_wave,
             v_wave=self.v_wave,
-            grid_data=grid_data,
+            times=self.times.mjd,
             step_size=step_size,
             time_cutoff_idx=time_cutoff_idx,
         )
@@ -401,7 +482,7 @@ class Gridder:
         fov: float,
         stokes_components: list[str] | str = "I",
         polarizations: list[str] | str | None = None,
-    ):
+    ) -> GridData:
         """Initializes the gridder with the visibility data which is generated by the
         ``pyvisgen.simulation.vis_loop`` function.
         Additionally one can define which stokes components should be calculated
@@ -415,17 +496,22 @@ class Gridder:
         obs : pyvisgen.simulation.Observation
             The observation which is returned by the
             ``pyvisgen.simulation.vis_loop`` function.
+
         vis_data : pyvisgen.simulation.Visibilities
             The visibility data which is returned by the
             ``pyvisgen.simulation.vis_loop`` function.
+
         img_size : int
             The size of the image in pixels.
+
         fov : float
             The physical size of the image in asec.
+
         stokes_components : list[str] | str, optional
             The Stokes components which are to be calculated and saved in the gridder.
             This can either be a list of components (e.g. ``['I', 'V']``) or a single
             string. Default is ``'I'``.
+
         polarizations : list[str] | str | None, optional
             The polarization type. Default is ``None``.
         """
@@ -498,7 +584,7 @@ class Gridder:
         img_size: int,
         fov: float,
         uv_colnames: dict = None,
-    ):
+    ) -> GridData:
         """Initializes the gridder with the visibility data in a
         given FITS file using the default Gridder for the radionets-project.
         Currently only extraction of the Stokes I component is supported.
@@ -509,10 +595,13 @@ class Gridder:
         ----------
         path : str
             The path to the FITS file.
+
         img_size : int
             The size of the image in pixels.
+
         fov : float
             The physical size of the image in asec.
+
         uv_colnames : dict, optional
             Alternative names for the U and V columns in the FITS file.
             Default is {'u': None, 'v': None}, meaning the default values of
@@ -576,7 +665,7 @@ class Gridder:
         ref_frequency_id: int = 0,
         use_calibrated: bool = False,
         filter_flagged: bool = True,
-    ):
+    ) -> GridData:
         """Initializes the Gridder with a measurement which is saved in an
         NRAO CASA Measurement Set. Currently only extraction of the Stokes I
         component is supported.
@@ -585,20 +674,26 @@ class Gridder:
         ----------
         path: str
             The path of the measurement set root directory.
+
         img_size: int
             The size of the image in pixels.
+
         fov: float
             The physical size of the image in asec.
+
         desc_id: int, optional
             The desc_id of the visibilites which should be gridded.
             This can be used to choose the component of a composite observation.
             Default is ``None``, which means that all observations will be used.
+
         ref_frequency_id: int, optional
             The index of the reference frequency that will be used if the measurement
             is a composite observation and no desc_id is given.
+
         use_calibrated: bool, optional
             Whether to use the calibrated data from the MODEL_DATA column or the
             raw data from the DATA column. Default is ``True``.
+
         filter_flagged: bool, optional
             Whether to filter out flagged data rows. Default is ``True``.
         """
@@ -670,55 +765,62 @@ class Gridder:
 
         return cls
 
-    def plot_ungridded_uv(self, **kwargs):
+    def plot_ungridded_uv(
+        self, **kwargs
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
         """Plots the ungridded (u,v) points as a scatter plot.
 
         Parameters
         ----------
-        gridder : pyvisgrid.Gridder
-            The gridder from which to take the (u,v) coordinates.
+
         mode : str, optional
             The mode specifying the scale of the (u,v) coordinates.
             This can be either ``wave``, meaning the coordinates are
             plotted in units of the reference wavelength, or ``meter``,
             meaning the (u,v) coordinates will be plotted in meter.
             Default is ``wave``.
+
         show_times : bool, optional
             Whether to show the timestamps of the measured visibilities
             as a colormap. Default is ``True``.
+
         use_relative_time : bool, optional
             Whether to show the times relative to the timestamp of the
             first measurement in hours.
             Default is ``True``.
+
         times_cmap: str | matplotlib.colors.Colormap, optional
             The colormap to be used for the time component of the plot.
             Default is ``'inferno'``.
-        colorbar_shrink: float, optional
-            The shrink parameter of the colorbar. This can be needed if the plot is
-            included as a subplot to adjust the size of the colorbar.
-            Default is ``1``, meaning original scale.
+
         marker_size : float | None, optional
             The size of the scatter markers in points**2.
             Default is ``None``, meaning the default value supplied by
             your matplotlib rcParams.
+
         plot_args : dict, optional
             The additional arguments passed to the scatter plot.
             Default is ``{"color":"royalblue"}``.
+
         fig_args : dict, optional
             The additional arguments passed to the figure.
             If a figure object is given in the ``fig`` parameter, this
             value will be discarded.
             Default is ``{}``.
+
         save_to : str | None, optional
             The name of the file to save the plot to.
             Default is ``None``, meaning the plot won't be saved.
+
         save_args : dict, optional
             The additional arguments passed to the ``fig.savefig`` call.
             Default is ``{"bbox_inches":"tight"}``.
+
         fig : matplotlib.figure.Figure | None, optional
             A custom figure object.
             If set to ``None``, the ``ax`` parameter also has to be ``None``!
             Default is ``None``.
+
         ax : matplotlib.axes.Axes | None, optional
             A custom axes object.
             If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -728,13 +830,16 @@ class Gridder:
         -------
         fig : matplotlib.figure.Figure
             The figure object.
+
         ax : matplotlib.axes.Axes
             The axes object.
         """
 
         return plotting.plot_ungridded_uv(gridder=self, **kwargs)
 
-    def plot_mask(self, stokes_component: str = "I", **kwargs):
+    def plot_mask(
+        self, stokes_component: str = "I", **kwargs
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
         """Plots the (u,v) mask (the binned visibilities) of the gridded
         interferometric image.
 
@@ -745,6 +850,7 @@ class Gridder:
             The specified component has to be initialized and gridded first!
             Otherwise this will result in a ``KeyError``.
             Default is ``'I'``.
+
         mode : str, optional
             The mode specifying which values of the mask should be plotted.
             Possible values are:
@@ -765,6 +871,7 @@ class Gridder:
             - ``imag``:     Plots the imaginary part of the gridded visibilities.
 
             Default is ``hist``.
+
         crop : tuple[list[float | None]], optional
             The crop of the image. This has to have the format
             ``([x_left, x_right], [y_left, y_right])``, where the left and right
@@ -773,18 +880,19 @@ class Gridder:
             IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
             via the ``plot_args`` parameter, this will be the scale in which one
             has to give the crop! If not, the crop has to be in pixels.
+
         norm : str | matplotlib.colors.Normalize | None, optional
             The name of the norm or a matplotlib norm.
-            Possible values are:
+            Possible string values are:
 
             - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
-                                values above the maximum will be mapped to the maximum
-                                and values below the minimum will be mapped to the
-                                minimum, thus avoiding the appearance of a colormaps
-                                'over' and 'under' colors (e.g. in case of negative
-                                values). Depending on the use case this is desirable but
-                                in case that it is not, one can set the norm to
-                                ``log_noclip`` or provide a custom norm.
+                                values above the maximum will be mapped to
+                                the maximum and values below the minimum will be mapped
+                                to the minimum, thus avoiding the appearance of a
+                                colormaps 'over' and 'under' colors (e.g. in case
+                                of negative values). Depending on the use case this is
+                                desirable but in case that it is not, one can set the
+                                norm to ``log_noclip`` or provide a custom norm.
 
             - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
@@ -794,35 +902,39 @@ class Gridder:
                                 square-root of the values.
 
             - other:            A value not declared above will be returned as is,
-                                meaning that this could be any value which exists in
-                                matplotlib itself.
+                                meaning that this could be any value which exists
+                                in matplotlib itself.
 
             Default is ``None``, meaning no norm will be applied.
-        colorbar_shrink: float, optional
-            The shrink parameter of the colorbar. This can be needed if the plot is
-            included as a subplot to adjust the size of the colorbar.
-            Default is ``1``, meaning original scale.
+
         cmap: str | matplotlib.colors.Colormap | None, optional
             The colormap to be used for the plot.
             Default is ``None``, meaning the colormap will be default to a value
             fitting for the chosen mode.
+
         plot_args : dict, optional
             The additional arguments passed to the scatter plot.
             Default is ``{"color":"royalblue"}``.
+
         fig_args : dict, optional
             The additional arguments passed to the figure.
             If a figure object is given in the ``fig`` parameter, this
-            value will be discarded. Default is ``{}``.
+            value will be discarded.
+            Default is ``{}``.
+
         save_to : str | None, optional
             The name of the file to save the plot to.
             Default is ``None``, meaning the plot won't be saved.
+
         save_args : dict, optional
             The additional arguments passed to the ``fig.savefig`` call.
             Default is ``{"bbox_inches":"tight"}``.
+
         fig : matplotlib.figure.Figure | None, optional
             A custom figure object.
             If set to ``None``, the ``ax`` parameter also has to be ``None``!
             Default is ``None``.
+
         ax : matplotlib.axes.Axes | None, optional
             A custom axes object.
             If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -832,13 +944,16 @@ class Gridder:
         -------
         fig : matplotlib.figure.Figure
             The figure object.
+
         ax : matplotlib.axes.Axes
             The axes object.
         """
 
         return plotting.plot_mask(self[stokes_component], **kwargs)
 
-    def plot_dirty_image(self, stokes_component: str = "I", **kwargs):
+    def plot_dirty_image(
+        self, stokes_component: str = "I", **kwargs
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
         """Plots the (u,v) dirty image, meaning the 2d Fourier transform of the
         gridded visibilities.
 
@@ -849,9 +964,9 @@ class Gridder:
             The specified component has to be initialized and gridded first!
             Otherwise this will result in a ``KeyError``.
             Default is ``'I'``.
-        mode : str, optional
-            The mode specifying which values of the mask should be plotted.
 
+        mode : str, optional
+            The mode specifying which values of the dirty image should be plotted.
             Possible values are:
 
             - ``real``:     Plots the real part of the dirty image.
@@ -861,34 +976,38 @@ class Gridder:
             - ``abs``:      Plot the absolute value of the dirty image.
 
             Default is ``real``.
-        ax_unit: str | astropy.units.unit, optional
+
+        ax_unit: str | astropy.units.Unit, optional
             The unit in which to show the ticks of the x and y-axes in.
-            The y-axis is the Declination (DEC) and the x-axis is the Right Ascension
-            (RA). The latter one is defined as increasing from left to right!
+            The y-axis is the Declination (DEC) and the x-axis is the
+            Right Ascension (RA). The latter one is defined as increasing
+            from left to right!
             The unit has to be given as a string or an ``astropy.units.Unit``.
             The string must correspond to the string representation of an
             ``astropy.units.Unit``.
 
-            Valid units are either ``pixel`` or angle units like ``arcsec``,
-            ``degree`` etc. Default is ``pixel``.
+            Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
+            etc. Default is ``pixel``.
+
         center_pos: tuple | None, optional
             The coordinate center of the image. The coordinates have to
             be given in the unit defined in the parameter ``ax_unit`` above.
             If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
             Default is ``None``, meaning the coordinates of the axes will be
             given as relative.
+
         norm : str | matplotlib.colors.Normalize | None, optional
             The name of the norm or a matplotlib norm.
-            Possible values are:
+            Possible string values are:
 
             - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
-                                values above the maximum will be mapped to the maximum
-                                and values below the minimum will be mapped to the
-                                minimum, thus avoiding the appearance of a colormaps
-                                'over' and 'under' colors (e.g. in case of negative
-                                values). Depending on the use case this is desirable but
-                                in case that it is not, one can set the norm to
-                                ``log_noclip`` or provide a custom norm.
+                                values above the maximum will be mapped to
+                                the maximum and values below the minimum will be mapped
+                                to the minimum, thus avoiding the appearance of a
+                                colormaps 'over' and 'under' colors (e.g. in case
+                                of negative values). Depending on the use case this is
+                                desirable but in case that it is not, one can set the
+                                norm to ``log_noclip`` or provide a custom norm.
 
             - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
@@ -898,36 +1017,43 @@ class Gridder:
                                 square-root of the values.
 
             - other:            A value not declared above will be returned as is,
-                                meaning that this could be any value which exists in
-                                matplotlib itself.
+                                meaning that this could be any value which exists
+                                in matplotlib itself.
 
             Default is ``None``, meaning no norm will be applied.
+
         colorbar_shrink: float, optional
             The shrink parameter of the colorbar. This can be needed if the plot is
             included as a subplot to adjust the size of the colorbar.
             Default is ``1``, meaning original scale.
-        cmap: str | matplotlib.colors.Colormap | None, optional
+
+        cmap: str | matplotlib.colors.Colormap, optional
             The colormap to be used for the plot.
-            Default is ``None``, meaning the colormap will be default to a value
-            fitting for the chosen mode.
-        plot_args : dict, optional
+            Default is ``'inferno'``.
+
+        plot_args : dict | None, optional
             The additional arguments passed to the scatter plot.
-            Default is ``{"color":"royalblue"}``.
-        fig_args : dict, optional
+            Default is ``None``.
+
+        fig_args : dict | None, optional
             The additional arguments passed to the figure.
             If a figure object is given in the ``fig`` parameter, this
             value will be discarded.
-            Default is ``{}``.
+            Default is ``None``.
+
         save_to : str | None, optional
             The name of the file to save the plot to.
             Default is ``None``, meaning the plot won't be saved.
+
         save_args : dict, optional
             The additional arguments passed to the ``fig.savefig`` call.
             Default is ``{"bbox_inches":"tight"}``.
+
         fig : matplotlib.figure.Figure | None, optional
             A custom figure object.
             If set to ``None``, the ``ax`` parameter also has to be ``None``!
             Default is ``None``.
+
         ax : matplotlib.axes.Axes | None, optional
             A custom axes object.
             If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -937,6 +1063,7 @@ class Gridder:
         -------
         fig : matplotlib.figure.Figure
             The figure object.
+
         ax : matplotlib.axes.Axes
             The axes object.
         """

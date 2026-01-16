@@ -202,51 +202,62 @@ def plot_ungridded_uv(
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plots the ungridded (u,v) points as a scatter plot.
 
     Parameters
     ----------
     gridder : pyvisgrid.Gridder
         The gridder from which to take the (u,v) coordinates.
+
     mode : str, optional
         The mode specifying the scale of the (u,v) coordinates.
         This can be either ``wave``, meaning the coordinates are
         plotted in units of the reference wavelength, or ``meter``,
         meaning the (u,v) coordinates will be plotted in meter.
         Default is ``wave``.
+
     show_times : bool, optional
         Whether to show the timestamps of the measured visibilities
         as a colormap. Default is ``True``.
+
     use_relative_time : bool, optional
         Whether to show the times relative to the timestamp of the
         first measurement in hours.
         Default is ``True``.
+
     times_cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the time component of the plot.
         Default is ``'inferno'``.
+
     marker_size : float | None, optional
         The size of the scatter markers in points**2.
         Default is ``None``, meaning the default value supplied by
         your matplotlib rcParams.
+
     plot_args : dict, optional
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.
+
     fig_args : dict, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
         Default is ``{}``.
+
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
+
     save_args : dict, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
+
     fig : matplotlib.figure.Figure | None, optional
         A custom figure object.
         If set to ``None``, the ``ax`` parameter also has to be ``None``!
         Default is ``None``.
+
     ax : matplotlib.axes.Axes | None, optional
         A custom axes object.
         If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -256,10 +267,9 @@ def plot_ungridded_uv(
     -------
     fig : matplotlib.figure.Figure
         The figure object.
+
     ax : matplotlib.axes.Axes
         The axes object.
-    scat : matplotlib.collections.PathCollection
-        The artist object.
     """
     if plot_args is None:
         plot_args = dict(color="royalblue") if not show_times else dict()
@@ -337,7 +347,7 @@ def plot_mask(
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plots the (u,v) mask (the binned visibilities) of the gridded
     interferometric image.
 
@@ -347,6 +357,7 @@ def plot_mask(
         The gridded data from the ``pyvisgrid.Gridder.grid`` method.
         This always represents the gridded visibilities of one
         Stokes component.
+
     mode : str, optional
         The mode specifying which values of the mask should be plotted.
         Possible values are:
@@ -367,6 +378,7 @@ def plot_mask(
         - ``imag``:     Plots the imaginary part of the gridded visibilities.
 
         Default is ``hist``.
+
     crop : tuple[list[float | None]], optional
         The crop of the image. This has to have the format
         ``([x_left, x_right], [y_left, y_right])``, where the left and right
@@ -375,6 +387,7 @@ def plot_mask(
         IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
         via the ``plot_args`` parameter, this will be the scale in which one
         has to give the crop! If not, the crop has to be in pixels.
+
     norm : str | matplotlib.colors.Normalize | None, optional
         The name of the norm or a matplotlib norm.
         Possible values are:
@@ -400,28 +413,35 @@ def plot_mask(
                             itself.
 
         Default is ``None``, meaning no norm will be applied.
+
     cmap: str | matplotlib.colors.Colormap | None, optional
         The colormap to be used for the plot.
         Default is ``None``, meaning the colormap will be default to a value
         fitting for the chosen mode.
+
     plot_args : dict, optional
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.
+
     fig_args : dict, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
         Default is ``{}``.
+
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
+
     save_args : dict, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
+
     fig : matplotlib.figure.Figure | None, optional
         A custom figure object.
         If set to ``None``, the ``ax`` parameter also has to be ``None``!
         Default is ``None``.
+
     ax : matplotlib.axes.Axes | None, optional
         A custom axes object.
         If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -431,10 +451,9 @@ def plot_mask(
     -------
     fig : matplotlib.figure.Figure
         The figure object.
+
     ax : matplotlib.axes.Axes
         The axes object.
-    im : matplotlib.image.AxesImage
-        The artist object.
     """
     if plot_args is None:
         plot_args = {}
@@ -559,7 +578,7 @@ def plot_dirty_image(
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plots the (u,v) dirty image, meaning the 2d Fourier transform of the
     gridded visibilities.
 
@@ -569,8 +588,9 @@ def plot_dirty_image(
         The gridded data from the ``pyvisgrid.Gridder.grid`` method.
         This always represents the gridded visibilities of one
         Stokes component.
+
     mode : str, optional
-        The mode specifying which values of the mask should be plotted.
+        The mode specifying which values of the dirty image should be plotted.
         Possible values are:
 
         - ``real``:     Plots the real part of the dirty image.
@@ -580,6 +600,7 @@ def plot_dirty_image(
         - ``abs``:      Plot the absolute value of the dirty image.
 
         Default is ``real``.
+
     ax_unit: str | astropy.units.Unit, optional
         The unit in which to show the ticks of the x and y-axes in.
         The y-axis is the Declination (DEC) and the x-axis is the Right Ascension (RA).
@@ -590,12 +611,14 @@ def plot_dirty_image(
 
         Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
         etc. Default is ``pixel``.
+
     center_pos: tuple | None, optional
         The coordinate center of the image. The coordinates have to
         be given in the unit defined in the parameter ``ax_unit`` above.
         If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
         Default is ``None``, meaning the coordinates of the axes will be
         given as relative.
+
     norm : str | matplotlib.colors.Normalize | None, optional
         The name of the norm or a matplotlib norm.
         Possible string values are:
@@ -620,31 +643,39 @@ def plot_dirty_image(
                             itself.
 
         Default is ``None``, meaning no norm will be applied.
+
     colorbar_shrink: float, optional
         The shrink parameter of the colorbar. This can be needed if the plot is
         included as a subplot to adjust the size of the colorbar.
         Default is ``1``, meaning original scale.
+
     cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the plot.
         Default is ``'inferno'``.
+
     plot_args : dict | None, optional
         The additional arguments passed to the scatter plot.
         Default is ``None``.
+
     fig_args : dict | None, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
         Default is ``None``.
+
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
+
     save_args : dict, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
+
     fig : matplotlib.figure.Figure | None, optional
         A custom figure object.
         If set to ``None``, the ``ax`` parameter also has to be ``None``!
         Default is ``None``.
+
     ax : matplotlib.axes.Axes | None, optional
         A custom axes object.
         If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -654,10 +685,9 @@ def plot_dirty_image(
     -------
     fig : matplotlib.figure.Figure
         The figure object.
+
     ax : matplotlib.axes.Axes
         The axes object.
-    im : matplotlib.image.AxesImage
-        The artist object.
     """
     if plot_args is None:
         plot_args = {}
