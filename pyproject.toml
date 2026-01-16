@@ -48,16 +48,13 @@ dependencies = [
 
 [project.optional-dependencies]
 pyvisgen = ["pyvisgen"]
+animations = ["cartopy", "mergedeep", "radionets-radiotools"]
+
 all = ["pyvisgrid[pyvisgen]"]
 
 
 [dependency-groups]
 
-animations = [
-  "cartopy",
-  "mergedeep",
-  #"radionets-radiotools"
-]
 
 tests = [
   "coverage>=7.10.2",
@@ -100,6 +97,7 @@ dev = [
   { include-group = "tests" },
   { include-group = "docs" },
 ]
+
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
