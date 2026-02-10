@@ -1,10 +1,19 @@
+from __future__ import annotations
+
 import warnings
+from typing import TYPE_CHECKING
 
 import astropy.units as units
 import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.time import Time
+from matplotlib.ticker import NullFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+if TYPE_CHECKING:
+    from pyvisgrid.core.gridder import Gridder
 
 __all__ = ["plot_ungridded_uv", "plot_dirty_image", "plot_mask"]
 
@@ -49,7 +58,12 @@ def _configure_axes(
     return fig, ax
 
 
-def _get_norm(norm: str):
+def _get_norm(
+    norm: str,
+    vmax: float | None = None,
+    vmin: float | None = None,
+    vcenter: float = 0,
+):
     """Converts a string parameter to a matplotlib norm.
 
     Parameters
@@ -77,6 +91,18 @@ def _get_norm(norm: str):
                             that this could be any value which exists in matplotlib
                             itself.
 
+    vmax : float | None, optional
+        The maximum value of the range to normalize. This might not have an effect
+        for every norm. Default is ``None``.
+
+    vmin : float | None, optional
+        The minimum value of the range to normalize. This might not have an effect
+        for every norm. Default is ``None``.
+
+    vcenter : float | None, optional
+        The central value of the range to normalize. This might not have an effect
+        for every norm. Default is ``0``.
+
     Returns
     -------
     matplotlib.colors.Normalize | str
@@ -84,13 +110,35 @@ def _get_norm(norm: str):
     """
     match norm:
         case "log":
-            return matplotlib.colors.LogNorm(clip=True)
+            if vmin == 0:
+                vmin = np.finfo(float).eps
+                warnings.warn(
+                    f"Since the given vmin is 0, the value was set to {vmin}"
+                    " to enable logarithmic normalization.",
+                    stacklevel=1,
+                )
+
+            return matplotlib.colors.LogNorm(clip=True, vmin=vmin, vmax=vmax)
         case "log_noclip":
-            return matplotlib.colors.LogNorm(clip=False)
+            if vmin == 0:
+                vmin = np.finfo(float).eps
+                warnings.warn(
+                    f"Since the given vmin is 0, the value was set to {vmin}"
+                    " to enable logarithmic normalization.",
+                    stacklevel=1,
+                )
+
+            return matplotlib.colors.LogNorm(clip=False, vmin=vmin, vmax=vmax)
         case "centered":
-            return matplotlib.colors.CenteredNorm()
+            if vmin is not None and vmax is not None:
+                return matplotlib.colors.CenteredNorm(
+                    vcenter=vcenter, halfrange=np.max([np.abs(vmin), np.abs(vmax)])
+                )
+            else:
+                return matplotlib.colors.CenteredNorm(vcenter=vcenter)
+
         case "sqrt":
-            return matplotlib.colors.PowerNorm(0.5)
+            return matplotlib.colors.PowerNorm(0.5, vmin=vmin, vmax=vmax)
         case _:
             return norm
 
@@ -116,13 +164,36 @@ def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
     ax.set_ylim(crop[1][0], crop[1][1])
 
 
+# based on https://stackoverflow.com/a/18195921 by "bogatron"
+def _configure_colorbar(
+    mappable: mpl.cm.ScalarMappable,
+    ax: mpl.axes.Axes,
+    fig: mpl.figure.Figure,
+    label: str | None,
+    show_ticks: bool = True,
+    fontsize: str = "medium",
+) -> mpl.colorbar.Colorbar:
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(mappable, cax=cax)
+    cbar.set_label(label, fontsize=fontsize)
+
+    if not show_ticks:
+        cbar.set_ticks([])
+        cbar.ax.yaxis.set_major_formatter(NullFormatter())
+        cbar.ax.yaxis.set_minor_formatter(NullFormatter())
+    else:
+        cbar.ax.tick_params(labelsize=fontsize)
+
+    return cbar
+
+
 def plot_ungridded_uv(
-    gridder,
+    gridder: Gridder,
     mode: str = "wave",
     show_times: bool = True,
     use_relative_time: bool = True,
-    time_cmap: str | matplotlib.colors.Colormap = "inferno",
-    colorbar_shrink: float = 1.0,
+    time_cmap: str | matplotlib.colors.Colormap = "magma",
     marker_size: float | None = None,
     aspect_args: dict | None = None,
     plot_args: dict = None,
@@ -131,55 +202,62 @@ def plot_ungridded_uv(
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plots the ungridded (u,v) points as a scatter plot.
 
     Parameters
     ----------
     gridder : pyvisgrid.Gridder
         The gridder from which to take the (u,v) coordinates.
+
     mode : str, optional
         The mode specifying the scale of the (u,v) coordinates.
         This can be either ``wave``, meaning the coordinates are
         plotted in units of the reference wavelength, or ``meter``,
         meaning the (u,v) coordinates will be plotted in meter.
         Default is ``wave``.
+
     show_times : bool, optional
         Whether to show the timestamps of the measured visibilities
         as a colormap. Default is ``True``.
+
     use_relative_time : bool, optional
         Whether to show the times relative to the timestamp of the
         first measurement in hours.
         Default is ``True``.
+
     times_cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the time component of the plot.
         Default is ``'inferno'``.
-    colorbar_shrink: float, optional
-        The shrink parameter of the colorbar. This can be needed if the plot is
-        included as a subplot to adjust the size of the colorbar.
-        Default is ``1``, meaning original scale.
+
     marker_size : float | None, optional
         The size of the scatter markers in points**2.
         Default is ``None``, meaning the default value supplied by
         your matplotlib rcParams.
+
     plot_args : dict, optional
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.
+
     fig_args : dict, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
         Default is ``{}``.
+
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
+
     save_args : dict, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
+
     fig : matplotlib.figure.Figure | None, optional
         A custom figure object.
         If set to ``None``, the ``ax`` parameter also has to be ``None``!
         Default is ``None``.
+
     ax : matplotlib.axes.Axes | None, optional
         A custom axes object.
         If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -189,6 +267,7 @@ def plot_ungridded_uv(
     -------
     fig : matplotlib.figure.Figure
         The figure object.
+
     ax : matplotlib.axes.Axes
         The axes object.
     """
@@ -208,10 +287,12 @@ def plot_ungridded_uv(
 
     match mode:
         case "wave":
-            u, v = gridder.u_wave, gridder.v_wave
+            u = gridder.u_wave
+            v = gridder.v_wave
             unit = "$\\lambda$"
         case "meter":
-            u, v = gridder.u_meter, gridder.v_meter
+            u = gridder.u_meter
+            v = gridder.v_meter
             unit = "m"
         case _:
             raise ValueError(
@@ -240,7 +321,7 @@ def plot_ungridded_uv(
     )
 
     if show_times:
-        fig.colorbar(scat, ax=ax, shrink=colorbar_shrink, label="Time / " + time_unit)
+        _configure_colorbar(mappable=scat, ax=ax, fig=fig, label="Time / " + time_unit)
 
     ax.set_aspect(**aspect_args)
     scat.set_rasterized(True)
@@ -259,7 +340,6 @@ def plot_mask(
     mode: str = "hist",
     crop: tuple[list[float | None]] = ([None, None], [None, None]),
     norm: str | matplotlib.colors.Normalize = None,
-    colorbar_shrink: float = 1,
     cmap: str | matplotlib.colors.Colormap | None = None,
     plot_args: dict = None,
     fig_args: dict = None,
@@ -267,7 +347,7 @@ def plot_mask(
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plots the (u,v) mask (the binned visibilities) of the gridded
     interferometric image.
 
@@ -277,6 +357,7 @@ def plot_mask(
         The gridded data from the ``pyvisgrid.Gridder.grid`` method.
         This always represents the gridded visibilities of one
         Stokes component.
+
     mode : str, optional
         The mode specifying which values of the mask should be plotted.
         Possible values are:
@@ -297,6 +378,7 @@ def plot_mask(
         - ``imag``:     Plots the imaginary part of the gridded visibilities.
 
         Default is ``hist``.
+
     crop : tuple[list[float | None]], optional
         The crop of the image. This has to have the format
         ``([x_left, x_right], [y_left, y_right])``, where the left and right
@@ -305,6 +387,7 @@ def plot_mask(
         IMPORTANT: If one supplies the ``plt.imshow`` an ``extent`` parameter
         via the ``plot_args`` parameter, this will be the scale in which one
         has to give the crop! If not, the crop has to be in pixels.
+
     norm : str | matplotlib.colors.Normalize | None, optional
         The name of the norm or a matplotlib norm.
         Possible values are:
@@ -330,32 +413,35 @@ def plot_mask(
                             itself.
 
         Default is ``None``, meaning no norm will be applied.
-    colorbar_shrink: float, optional
-        The shrink parameter of the colorbar. This can be needed if the plot is
-        included as a subplot to adjust the size of the colorbar.
-        Default is ``1``, meaning original scale.
+
     cmap: str | matplotlib.colors.Colormap | None, optional
         The colormap to be used for the plot.
         Default is ``None``, meaning the colormap will be default to a value
         fitting for the chosen mode.
+
     plot_args : dict, optional
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.
+
     fig_args : dict, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
         Default is ``{}``.
+
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
+
     save_args : dict, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
+
     fig : matplotlib.figure.Figure | None, optional
         A custom figure object.
         If set to ``None``, the ``ax`` parameter also has to be ``None``!
         Default is ``None``.
+
     ax : matplotlib.axes.Axes | None, optional
         A custom axes object.
         If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -365,6 +451,7 @@ def plot_mask(
     -------
     fig : matplotlib.figure.Figure
         The figure object.
+
     ax : matplotlib.axes.Axes
         The axes object.
     """
@@ -383,8 +470,8 @@ def plot_mask(
         "hist": "inferno",
         "abs": "viridis",
         "phase": "RdBu",
-        "real": "RdBu",
-        "imag": "RdBu",
+        "real": "PiYG",
+        "imag": "PuOr",
     }
 
     cmap = cmap_dict[mode] if cmap is None else cmap
@@ -401,9 +488,10 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(
-                im, ax=ax, shrink=colorbar_shrink, label="$(u,v)$ per frequel / 1/fq"
+            _configure_colorbar(
+                mappable=im, ax=ax, fig=fig, label="$(u,v)$ per frequel / 1/fq"
             )
+
         case "abs":
             mask_abs, _ = grid_data.get_mask_abs_phase()
             im = ax.imshow(
@@ -414,7 +502,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Amplitude / a.u.")
+            _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Amplitude / a.u.")
         case "phase":
             _, mask_phase = grid_data.get_mask_abs_phase()
             im = ax.imshow(
@@ -423,10 +511,16 @@ def plot_mask(
                 origin="lower",
                 interpolation="none",
                 cmap=cmap,
+                vmin=-np.pi,
+                vmax=np.pi,
                 **plot_args,
             )
-            cbar = fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Phase / rad")
-
+            cbar = _configure_colorbar(
+                mappable=im,
+                ax=ax,
+                fig=fig,
+                label="Phase / rad",
+            )
             cbar.set_ticks(np.arange(-np.pi, 3 / 2 * np.pi, np.pi / 2))
             cbar.set_ticklabels(["$-\\pi$", "$-\\pi/2$", "$0$", "$\\pi/2$", "$\\pi$"])
         case "real":
@@ -438,7 +532,7 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Real Part / a.u.")
+            _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Real Part / a.u.")
         case "imag":
             im = ax.imshow(
                 grid_data.mask_imag,
@@ -448,9 +542,11 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            fig.colorbar(
-                im, ax=ax, shrink=colorbar_shrink, label="Imaginary Part / a.u."
+
+            _configure_colorbar(
+                mappable=im, ax=ax, fig=fig, label="Imaginary Part / a.u."
             )
+
         case _:
             raise ValueError(
                 f"The given mode does not exist!"
@@ -482,7 +578,7 @@ def plot_dirty_image(
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Plots the (u,v) dirty image, meaning the 2d Fourier transform of the
     gridded visibilities.
 
@@ -492,8 +588,9 @@ def plot_dirty_image(
         The gridded data from the ``pyvisgrid.Gridder.grid`` method.
         This always represents the gridded visibilities of one
         Stokes component.
+
     mode : str, optional
-        The mode specifying which values of the mask should be plotted.
+        The mode specifying which values of the dirty image should be plotted.
         Possible values are:
 
         - ``real``:     Plots the real part of the dirty image.
@@ -503,6 +600,7 @@ def plot_dirty_image(
         - ``abs``:      Plot the absolute value of the dirty image.
 
         Default is ``real``.
+
     ax_unit: str | astropy.units.Unit, optional
         The unit in which to show the ticks of the x and y-axes in.
         The y-axis is the Declination (DEC) and the x-axis is the Right Ascension (RA).
@@ -513,12 +611,14 @@ def plot_dirty_image(
 
         Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
         etc. Default is ``pixel``.
+
     center_pos: tuple | None, optional
         The coordinate center of the image. The coordinates have to
         be given in the unit defined in the parameter ``ax_unit`` above.
         If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
         Default is ``None``, meaning the coordinates of the axes will be
         given as relative.
+
     norm : str | matplotlib.colors.Normalize | None, optional
         The name of the norm or a matplotlib norm.
         Possible string values are:
@@ -543,31 +643,39 @@ def plot_dirty_image(
                             itself.
 
         Default is ``None``, meaning no norm will be applied.
+
     colorbar_shrink: float, optional
         The shrink parameter of the colorbar. This can be needed if the plot is
         included as a subplot to adjust the size of the colorbar.
         Default is ``1``, meaning original scale.
+
     cmap: str | matplotlib.colors.Colormap, optional
         The colormap to be used for the plot.
         Default is ``'inferno'``.
-    plot_args : dict, optional
+
+    plot_args : dict | None, optional
         The additional arguments passed to the scatter plot.
-        Default is ``{"color":"royalblue"}``.
-    fig_args : dict, optional
+        Default is ``None``.
+
+    fig_args : dict | None, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
-        Default is ``{}``.
+        Default is ``None``.
+
     save_to : str | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
+
     save_args : dict, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
+
     fig : matplotlib.figure.Figure | None, optional
         A custom figure object.
         If set to ``None``, the ``ax`` parameter also has to be ``None``!
         Default is ``None``.
+
     ax : matplotlib.axes.Axes | None, optional
         A custom axes object.
         If set to ``None``, the ``fig`` parameter also has to be ``None``!
@@ -577,6 +685,7 @@ def plot_dirty_image(
     -------
     fig : matplotlib.figure.Figure
         The figure object.
+
     ax : matplotlib.axes.Axes
         The axes object.
     """
@@ -650,7 +759,7 @@ def plot_dirty_image(
         **plot_args,
     )
 
-    fig.colorbar(im, ax=ax, shrink=colorbar_shrink, label="Flux Density / Jy/pix")
+    _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Flux Density / Jy/pix")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)

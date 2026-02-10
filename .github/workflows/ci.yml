@@ -22,11 +22,13 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.11"
             install-method: mamba
+            extras: animations
 
           - os: ubuntu-latest
             python-version: "3.12"
             install-method: mamba
             extra-args: ["codecov"]
+            extras: animations
 
     defaults:
       run:
@@ -59,7 +61,7 @@ jobs:
         run: |
           python --version
           pip install --upgrade pip
-          pip install --group tests -e .
+          pip install --group tests -e ".[animations]"
           pip freeze
           pip list
 
@@ -100,7 +102,7 @@ jobs:
         run: |
           sudo apt update --yes && sudo apt install --yes git
           uv pip install --system . -U pip towncrier
-          uv pip install --system . --group docs -e .
+          uv pip install --system . --group docs -e ".[animations]"
           git describe --tags
 
       - name: Build docs
