@@ -48,10 +48,14 @@ dependencies = [
 
 [project.optional-dependencies]
 pyvisgen = ["pyvisgen"]
+animations = ["cartopy", "mergedeep", "radionets-radiotools"]
+
 all = ["pyvisgrid[pyvisgen]"]
 
 
 [dependency-groups]
+
+
 tests = [
   "coverage>=7.10.2",
   "h5py>=3.14.0",
@@ -93,6 +97,7 @@ dev = [
   { include-group = "tests" },
   { include-group = "docs" },
 ]
+
 
 [project.urls]
 repository = "https://github.com/radionets-project/pyvisgrid"
@@ -143,37 +148,37 @@ known-first-party = ["pyvisgrid"]
 
 
 [tool.towncrier]
-    package = "pyvisgrid"
-    directory = "docs/changes"
-    filename = "CHANGES.rst"
-    template = "docs/changes/template.rst"
-    # let towncrier create proper links to the merged PR
-    issue_format = "`#{issue} <https://github.com/radionets-project/pyvisgrid/pull/{issue}>`__"
+package = "pyvisgrid"
+directory = "docs/changes"
+filename = "CHANGES.rst"
+template = "docs/changes/template.rst"
+# let towncrier create proper links to the merged PR
+issue_format = "`#{issue} <https://github.com/radionets-project/pyvisgrid/pull/{issue}>`__"
 
-    [tool.towncrier.fragment.feature]
-        name = "New Features"
-        showcontent = true
+[tool.towncrier.fragment.feature]
+name = "New Features"
+showcontent = true
 
-    [tool.towncrier.fragment.bugfix]
-        name = "Bug Fixes"
-        showcontent = true
+[tool.towncrier.fragment.bugfix]
+name = "Bug Fixes"
+showcontent = true
 
-    [tool.towncrier.fragment.api]
-        name = "API Changes"
-        showcontent = true
+[tool.towncrier.fragment.api]
+name = "API Changes"
+showcontent = true
 
-    [tool.towncrier.fragment.datamodel]
-        name = "Data Model Changes"
-        showcontent = true
+[tool.towncrier.fragment.datamodel]
+name = "Data Model Changes"
+showcontent = true
 
-    [tool.towncrier.fragment.optimization]
-        name = "Refactoring and Optimization"
-        showcontent = true
+[tool.towncrier.fragment.optimization]
+name = "Refactoring and Optimization"
+showcontent = true
 
-    [tool.towncrier.fragment.maintenance]
-        name = "Maintenance"
-        showcontent = true
+[tool.towncrier.fragment.maintenance]
+name = "Maintenance"
+showcontent = true
 
-    [[tool.towncrier.section]]
-        name = ""
-        path = ""
+[[tool.towncrier.section]]
+name = ""
+path = ""
