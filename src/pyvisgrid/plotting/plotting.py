@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import warnings
+from os import PathLike
 from typing import TYPE_CHECKING
 
 import astropy.units as units
 import matplotlib
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.time import Time
@@ -22,7 +22,7 @@ def _configure_axes(
     fig: matplotlib.figure.Figure | None,
     ax: matplotlib.axes.Axes | None,
     fig_args: dict = None,
-):
+) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Configures figure and axis depending if they were given
     as parameters.
 
@@ -63,7 +63,7 @@ def _get_norm(
     vmax: float | None = None,
     vmin: float | None = None,
     vcenter: float = 0,
-):
+) -> matplotlib.colors.Normalize:
     """Converts a string parameter to a matplotlib norm.
 
     Parameters
@@ -143,7 +143,7 @@ def _get_norm(
             return norm
 
 
-def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
+def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]) -> None:
     """Applies a specific x and y limit ('crop') to the given axis.
     This will effectively crop the image.
 
@@ -151,6 +151,7 @@ def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
     ----------
     ax : matplotlib.axes.Axes
         The axis which to apply the limits to.
+
     crop : tuple[list[float | None]]
         The crop of the image. This has to have the format
         ``([x_left, x_right], [y_left, y_right])``, where the left and right
@@ -165,14 +166,50 @@ def _apply_crop(ax: matplotlib.axes.Axes, crop: tuple[list[float | None]]):
 
 
 # based on https://stackoverflow.com/a/18195921 by "bogatron"
+# The code between >> BEGIN and << END is therefore licensed under CC BY-SA 4.0
 def _configure_colorbar(
-    mappable: mpl.cm.ScalarMappable,
-    ax: mpl.axes.Axes,
-    fig: mpl.figure.Figure,
+    mappable: matplotlib.cm.ScalarMappable,
+    ax: matplotlib.axes.Axes,
+    fig: matplotlib.figure.Figure,
     label: str | None,
     show_ticks: bool = True,
-    fontsize: str = "medium",
-) -> mpl.colorbar.Colorbar:
+    fontsize: str | int = "medium",
+) -> matplotlib.colorbar.Colorbar:
+    """Helper function to configure the colorbar so that it is scaled correctly
+    in relation to the plot it belongs to.
+
+    Parameters
+    ----------
+
+    mappable : matplotlib.cm.ScalarMappable
+        The mappable (e.g. outputs of ``plt.imshow``, ``plt.scatter`` etc.) which will
+        be explained by the colorbar.
+
+    ax : matplotlib.axes.Axes
+        The axes to place the colorbar next to.
+
+    fig : matplotlib.figure.Figure
+        The figure to which the axes belong to.
+
+    label : str | None
+        The label of the colorbar. A value of ``None`` indicates that no label
+        should be added.
+
+    show_ticks : bool, optional
+        Whether to show the ticks of the colorbar. Default is ``True``.
+
+    fontsize : str | int, optional
+        The fontsize to use for the ticks and label of the colorbar.
+        Default is ``medium``.
+
+    Returns
+    -------
+
+    matplotlib.colorbar.Colorbar :
+        The colorbar object.
+
+    """
+    # >> BEGIN
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = fig.colorbar(mappable, cax=cax)
@@ -185,6 +222,8 @@ def _configure_colorbar(
     else:
         cbar.ax.tick_params(labelsize=fontsize)
 
+    # << END
+
     return cbar
 
 
@@ -196,9 +235,9 @@ def plot_ungridded_uv(
     time_cmap: str | matplotlib.colors.Colormap = "magma",
     marker_size: float | None = None,
     aspect_args: dict | None = None,
-    plot_args: dict = None,
-    fig_args: dict = None,
-    save_to: str | None = None,
+    plot_args: dict | None = None,
+    fig_args: dict | None = None,
+    save_to: str | PathLike | None = None,
     save_args: dict = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
@@ -226,7 +265,7 @@ def plot_ungridded_uv(
         first measurement in hours.
         Default is ``True``.
 
-    times_cmap: str | matplotlib.colors.Colormap, optional
+    times_cmap : str | matplotlib.colors.Colormap, optional
         The colormap to be used for the time component of the plot.
         Default is ``'inferno'``.
 
@@ -235,21 +274,21 @@ def plot_ungridded_uv(
         Default is ``None``, meaning the default value supplied by
         your matplotlib rcParams.
 
-    plot_args : dict, optional
+    plot_args : dict | None, optional
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.
 
-    fig_args : dict, optional
+    fig_args : dict | None, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
-        Default is ``{}``.
+        Default is ``None``.
 
-    save_to : str | None, optional
+    save_to : str | PathLike | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
 
-    save_args : dict, optional
+    save_args : dict | None, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
 
@@ -341,10 +380,10 @@ def plot_mask(
     crop: tuple[list[float | None]] = ([None, None], [None, None]),
     norm: str | matplotlib.colors.Normalize = None,
     cmap: str | matplotlib.colors.Colormap | None = None,
-    plot_args: dict = None,
-    fig_args: dict = None,
-    save_to: str | None = None,
-    save_args: dict = None,
+    plot_args: dict | None = None,
+    fig_args: dict | None = None,
+    save_to: str | PathLike | None = None,
+    save_args: dict | None = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
@@ -423,17 +462,17 @@ def plot_mask(
         The additional arguments passed to the scatter plot.
         Default is ``{"color":"royalblue"}``.
 
-    fig_args : dict, optional
+    fig_args : dict | None, optional
         The additional arguments passed to the figure.
         If a figure object is given in the ``fig`` parameter, this
         value will be discarded.
-        Default is ``{}``.
+        Default is ``None``.
 
-    save_to : str | None, optional
+    save_to : str | PathLike | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
 
-    save_args : dict, optional
+    save_args : dict | None, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
 
@@ -572,10 +611,10 @@ def plot_dirty_image(
     norm: str | matplotlib.colors.Normalize = None,
     colorbar_shrink: float = 1,
     cmap: str | matplotlib.colors.Colormap = "inferno",
-    plot_args: dict = None,
-    fig_args: dict = None,
-    save_to: str | None = None,
-    save_args: dict = None,
+    plot_args: dict | None = None,
+    fig_args: dict | None = None,
+    save_to: str | PathLike | None = None,
+    save_args: dict | None = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
@@ -663,11 +702,11 @@ def plot_dirty_image(
         value will be discarded.
         Default is ``None``.
 
-    save_to : str | None, optional
+    save_to : str | PathLike | None, optional
         The name of the file to save the plot to.
         Default is ``None``, meaning the plot won't be saved.
 
-    save_args : dict, optional
+    save_args : dict | None, optional
         The additional arguments passed to the ``fig.savefig`` call.
         Default is ``{"bbox_inches":"tight"}``.
 

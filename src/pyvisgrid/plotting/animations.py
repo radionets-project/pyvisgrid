@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -28,7 +28,7 @@ __all__ = ["plot_earth_layout", "plot_observation_state", "animate_observation"]
 _default_colors = mpl.colormaps["inferno"].resampled(10).colors
 
 
-def _is_value_in(value: object, lst: list) -> bool:
+def _is_value_in(value: Any, lst: list) -> bool:
     """Checks whether a given value is in a nested list.
 
     Parameters
@@ -94,6 +94,8 @@ def plot_earth_layout(
     show_night_shade: bool = True,
     marker_sizes: dict | None = None,
     plot_colors: dict | None = None,
+    save_to: str | PathLike | None = None,
+    save_args: dict | None = None,
     fig_args: dict | None = None,
     fig: mpl.figure.Figure | None = None,
     mosaic_axes: dict[mpl.axes.Axes] | None = None,
@@ -194,6 +196,14 @@ def plot_earth_layout(
                 "source": _default_colors[-2],
                 "connections": _default_colors[0],
             }
+
+    save_to : str | PathLike | None, optional
+        The location to save the plot to. If set to ``None``, the plot won't
+        be saved. Default is ``None``.
+
+    save_args : dict | None, optional
+        Additional arguments to provide to the ``Figure.savefig`` method.
+        Default is ``{"bbox_inches": "tight"}``.
 
     fig_args : dict | None, optional
         The arguments to pass to the figure. If a custom figure is given,
@@ -337,6 +347,13 @@ def plot_earth_layout(
     )
     projection._threshold = threshold_original
 
+    if save_to is not None:
+        save_to = Path(save_to)
+
+        save_args = {"bbox_inches": "tight"} if save_args is None else save_args
+
+        fig.savefig(save_to, **save_args)
+
     return fig, ax, mosaic_axes
 
 
@@ -355,6 +372,8 @@ def plot_observation_state(
     mask_mode: str = "amp_phase",
     swap_masks: bool = False,
     axes_options: dict | None = None,
+    save_to: str | PathLike | None = None,
+    save_args: dict | None = None,
 ) -> tuple[mpl.figure.Figure, dict[mpl.axes.Axes], dict[mpl.artist.Artist], dict]:
     """Plot several visualizations for a given state of an observation.
 
@@ -529,6 +548,14 @@ def plot_observation_state(
                     "plot_colors": None,
                 },
             }
+
+    save_to : str | PathLike | None, optional
+        The location to save the plot to. If set to ``None``, the plot won't
+        be saved. Default is ``None``.
+
+    save_args : dict | None, optional
+        Additional arguments to provide to the ``Figure.savefig`` method.
+        Default is ``{"bbox_inches":"tight"}``.
 
     Returns
     -------
@@ -896,6 +923,13 @@ def plot_observation_state(
             )
             plots[mask_key] = mask
 
+    if save_to is not None:
+        save_to = Path(save_to)
+
+        save_args = {"bbox_inches": "tight"} if save_args is None else save_args
+
+        fig.savefig(save_to, **save_args)
+
     return fig, ax, plots, axes_options
 
 
@@ -905,7 +939,7 @@ def animate_observation(
     src_dec: float,
     layout: Layout | str,
     interval: int,
-    save_to: PathLike,
+    save_to: str | PathLike,
     max_values: tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None = None,
     uv_max_extension: float = 0.2,
     plot_positions: list[list[str]] | None = None,
@@ -914,7 +948,7 @@ def animate_observation(
     swap_masks: bool = False,
     axes_options: dict | None = None,
     show_progress: bool = True,
-    dpi: int or str = "figure",
+    dpi: int | str = "figure",
 ) -> None:
     """Creates an animation from the given GridDataSeries.
 
@@ -938,7 +972,7 @@ def animate_observation(
     interval : int
         The interval between two images in milliseconds.
 
-    save_to : PathLike
+    save_to : str | PathLike
         The path to save the animation to. This has to include the filename and
         extensions.
 
@@ -1204,8 +1238,7 @@ def animate_observation(
 
         return return_vals
 
-    if isinstance(save_to, str):
-        save_to = Path(save_to)
+    save_to = Path(save_to)
 
     writer = None
     if save_to.suffix.lower() == ".gif":

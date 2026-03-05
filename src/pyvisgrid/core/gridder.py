@@ -228,7 +228,7 @@ class GridDataSeries:
         Parameters
         ----------
 
-        grid_data : GridData
+        GridData :
             The data to add to the series.
         """
         self._grid_data.append(grid_data)
@@ -883,16 +883,17 @@ class Gridder:
 
         norm : str | matplotlib.colors.Normalize | None, optional
             The name of the norm or a matplotlib norm.
-            Possible string values are:
+            Possible values are:
 
             - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
-                                values above the maximum will be mapped to
-                                the maximum and values below the minimum will be mapped
-                                to the minimum, thus avoiding the appearance of a
-                                colormaps 'over' and 'under' colors (e.g. in case
-                                of negative values). Depending on the use case this is
-                                desirable but in case that it is not, one can set the
-                                norm to ``log_noclip`` or provide a custom norm.
+                                values above the maximum will be mapped to the maximum
+                                and values below the minimum will be mapped to the
+                                minimum, thus avoiding the appearance of a colormaps
+                                'over' and 'under' colors (e.g. in case of negative
+                                values).
+                                Depending on the use case this is desirable but in
+                                case that it is not, one can set the norm to
+                                ``log_noclip`` or provide a custom norm.
 
             - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
@@ -902,8 +903,8 @@ class Gridder:
                                 square-root of the values.
 
             - other:            A value not declared above will be returned as is,
-                                meaning that this could be any value which exists
-                                in matplotlib itself.
+                                meaning that this could be any value which exists in
+                                matplotlib itself.
 
             Default is ``None``, meaning no norm will be applied.
 
@@ -916,17 +917,17 @@ class Gridder:
             The additional arguments passed to the scatter plot.
             Default is ``{"color":"royalblue"}``.
 
-        fig_args : dict, optional
+        fig_args : dict | None, optional
             The additional arguments passed to the figure.
             If a figure object is given in the ``fig`` parameter, this
             value will be discarded.
-            Default is ``{}``.
+            Default is ``None``.
 
-        save_to : str | None, optional
+        save_to : str | PathLike | None, optional
             The name of the file to save the plot to.
             Default is ``None``, meaning the plot won't be saved.
 
-        save_args : dict, optional
+        save_args : dict | None, optional
             The additional arguments passed to the ``fig.savefig`` call.
             Default is ``{"bbox_inches":"tight"}``.
 
@@ -980,8 +981,8 @@ class Gridder:
         ax_unit: str | astropy.units.Unit, optional
             The unit in which to show the ticks of the x and y-axes in.
             The y-axis is the Declination (DEC) and the x-axis is the
-            Right Ascension (RA). The latter one is defined as increasing
-            from left to right!
+            Right Ascension (RA).
+            The latter one is defined as increasing from left to right!
             The unit has to be given as a string or an ``astropy.units.Unit``.
             The string must correspond to the string representation of an
             ``astropy.units.Unit``.
@@ -998,16 +999,17 @@ class Gridder:
 
         norm : str | matplotlib.colors.Normalize | None, optional
             The name of the norm or a matplotlib norm.
-            Possible string values are:
+            Possible values are:
 
             - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
-                                values above the maximum will be mapped to
-                                the maximum and values below the minimum will be mapped
-                                to the minimum, thus avoiding the appearance of a
-                                colormaps 'over' and 'under' colors (e.g. in case
-                                of negative values). Depending on the use case this is
-                                desirable but in case that it is not, one can set the
-                                norm to ``log_noclip`` or provide a custom norm.
+                                values above the maximum will be mapped to the maximum
+                                and values below the minimum will be mapped to the
+                                minimum, thus avoiding the appearance of a colormaps
+                                'over' and 'under' colors (e.g. in case of negative
+                                values).
+                                Depending on the use case this is desirable but in
+                                case that it is not, one can set the norm to
+                                ``log_noclip`` or provide a custom norm.
 
             - ``log_noclip``:   Returns a logarithmic norm with clipping off.
 
@@ -1017,8 +1019,8 @@ class Gridder:
                                 square-root of the values.
 
             - other:            A value not declared above will be returned as is,
-                                meaning that this could be any value which exists
-                                in matplotlib itself.
+                                meaning that this could be any value which exists in
+                                matplotlib itself.
 
             Default is ``None``, meaning no norm will be applied.
 
@@ -1041,11 +1043,11 @@ class Gridder:
             value will be discarded.
             Default is ``None``.
 
-        save_to : str | None, optional
+        save_to : str | PathLike | None, optional
             The name of the file to save the plot to.
             Default is ``None``, meaning the plot won't be saved.
 
-        save_args : dict, optional
+        save_args : dict | None, optional
             The additional arguments passed to the ``fig.savefig`` call.
             Default is ``{"bbox_inches":"tight"}``.
 
