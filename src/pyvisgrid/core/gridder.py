@@ -16,6 +16,16 @@ from tqdm.auto import tqdm
 if TYPE_CHECKING:
     import matplotlib
     from pyvisgen.simulation import Observation, Visibilities
+    from radiotools.layouts import Layout
+
+try:
+    import pandas as pd
+    from radiotools.layouts import Layout
+
+    include_array_layout = True
+except ImportError:
+    include_array_layout = False
+
 
 import pyvisgrid.plotting as plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
@@ -139,8 +149,10 @@ class GridDataSeries:
         u_wave: np.ndarray,
         v_wave: np.ndarray,
         times: np.ndarray,
+        num_frequencies: int,
         step_size: int,
-        time_cutoff_idx: int | None = None,
+        time_start_idx: int = 0,
+        time_end_idx: int | None = None,
     ):
         self._grid_data_full: GridData = grid_data
         self._grid_data: list[GridData] = []
@@ -148,25 +160,34 @@ class GridDataSeries:
         self._u_wave: np.ndarray = u_wave
         self._v_wave: np.ndarray = v_wave
 
+        self._num_frequencies: int = num_frequencies
+
         self._times_full: np.ndarray = times
-        self._times_idx: np.ndarray = np.arange(len(self._times_full))[
-            :time_cutoff_idx
+
+        self.num_steps = self._times_full.size // self._num_frequencies
+
+        self._step_idx: np.ndarray = np.arange(self.num_steps)[
+            time_start_idx:time_end_idx
         ][::step_size]
+        self._times_idx: np.ndarray = np.tile(
+            np.arange(0, self.num_steps),
+            reps=self._num_frequencies,
+        )
 
         self._iter_idx: int = 0
 
     def __len__(self) -> int:
-        return self._times_idx.size
+        return self._step_idx.size
 
     def __getitem__(self, i) -> list[GridData, np.ndarray, np.ndarray, np.ndarray]:
         if not isinstance(i, int):
             raise TypeError("The index must be an integer!")
 
-        time_idx = self._times_idx[i]
+        time_idcs = self._get_time_idcs(step=i)
 
         result = [self._grid_data[i]]
         result.extend(self.get_uv_step(step=i))
-        result.extend([self._times_full[:time_idx]])
+        result.extend([self._times_full[time_idcs]])
 
         return result
 
@@ -183,6 +204,27 @@ class GridDataSeries:
         self._iter_idx += 1
         return num_result
 
+    def _get_time_idcs(self, step: int) -> np.ndarray:
+        """
+        Helper function which converts from animation step to time indices.
+
+        Parameters
+        ----------
+
+        step : int
+            The step index.
+
+        Returns
+        -------
+
+        np.ndarray :
+            Array of indices at which the times, coordinates and visibilities up to this
+            step index are located in their respective arrays.
+
+        """
+        step_idx = self._step_idx[step]
+        return np.argwhere(self._times_idx <= step_idx).ravel()
+
     def get_uv_step(self, step: int) -> tuple[np.ndarray, np.ndarray]:
         """
         Returns the ungridded :math:`(u,v)` coordinates for the given timestep.
@@ -197,9 +239,12 @@ class GridDataSeries:
         tuple[np.ndarray, np.ndarray]:
             The :math:`(u,v)` coordinates in the order ``(u, v)``.
         """
+
+        time_idcs = self._get_time_idcs(step=step)
+
         return (
-            self._u_wave[: self._times_idx[step]],
-            self._v_wave[: self._times_idx[step]],
+            self._u_wave[time_idcs],
+            self._v_wave[time_idcs],
         )
 
     def get_vis_step(self, step: int) -> GridData:
@@ -217,8 +262,10 @@ class GridDataSeries:
             The (un)gridded visibility data.
         """
 
+        time_idcs = self._get_time_idcs(step=step)
+
         grid_data = self._grid_data_full.copy()
-        grid_data.vis_data = grid_data.vis_data[: self._times_idx[step]]
+        grid_data.vis_data = grid_data.vis_data[time_idcs]
         return grid_data
 
     def add_grid_data(self, grid_data: GridData) -> None:
@@ -242,8 +289,11 @@ class Gridder:
         times: np.ndarray,
         img_size: int,
         fov: float,
+        src_ra: float,
+        src_dec: float,
         ref_frequency: float,
         frequency_offsets: ArrayLike,
+        antenna_layout: Layout | None = None,
     ):
         """Initializes the default Gridder of the radionets-project.
 
@@ -269,37 +319,62 @@ class Gridder:
         fov : float
             The physical size of the image in arcsec.
 
+        src_ra : float
+            The Right Ascension (RA) of the source in arcsec.
+
+        src_dec : float
+            The Declination (Dec) of the source in arcsec.
+
         ref_frequency : float
             The reference frequency of the data in Hertz.
 
         frequency_offsets : numpy.typing.ArrayLike
             The frequency offsets in Hertz.
+
+        antenna_layout : raditools.layouts.Layout | None, optional
+            The antenna layout as a radiotools ``Layout``.
+            This does not need to be provided to use the Gridder but only for
+            the creation of animations (needs the ``animations`` optional dependencies).
+            Defaults is ``None``.
         """
 
-        self.ref_frequency = ref_frequency
-        self.frequency_offsets = np.asarray(frequency_offsets).ravel()
+        self.src_ra: float = src_ra
+        self.src_dec: float = src_dec
 
-        self.frequencies = self.frequency_offsets + self.ref_frequency
+        self.ref_frequency: float = ref_frequency
+        self.frequency_offsets: np.ndarray = np.asarray(frequency_offsets).ravel()
+
+        self.frequencies: np.ndarray = self.frequency_offsets + self.ref_frequency
 
         u_wave = u_meter / c.value
         v_wave = v_meter / c.value
 
-        self.u_wave = np.concatenate([u_wave * freq for freq in self.frequencies])
-        self.v_wave = np.concatenate([v_wave * freq for freq in self.frequencies])
+        self.u_wave: np.ndarray = np.concatenate(
+            [u_wave * freq for freq in self.frequencies]
+        )
+        self.v_wave: np.ndarray = np.concatenate(
+            [v_wave * freq for freq in self.frequencies]
+        )
 
-        self.u_meter = u_meter
-        self.v_meter = v_meter
+        self.u_meter: np.ndarray = np.tile(u_meter, reps=self.frequencies.size)
+        self.v_meter: np.ndarray = np.tile(v_meter, reps=self.frequencies.size)
 
-        self.times = Time(np.tile(times, reps=self.frequencies.size), format="mjd")
+        self.times: Time = Time(
+            np.tile(times, reps=self.frequencies.size), format="mjd"
+        )
+        self.antenna_layout: Layout | None = antenna_layout
 
-        self.img_size = img_size
+        self.img_size: int = img_size
 
-        self.fov = np.deg2rad(fov / 3600)  # convert from asec to rad
+        self.fov: float = np.deg2rad(fov / 3600)  # convert from asec to rad
 
-        self.stokes = dict()  # initialize stokes component dictionary
+        self.stokes: dict = dict()  # initialize stokes component dictionary
 
     def __str__(self) -> str:
         return str(self.__dict__)
+
+    def __len__(self) -> int:
+        return len(self.times)
 
     def __getitem__(self, i: str) -> GridData:
         if not isinstance(i, str):
@@ -447,9 +522,45 @@ class Gridder:
     def grid_time_series(
         self,
         step_size: int,
-        time_cutoff_idx: int | None = None,
+        time_start_idx: int = 0,
+        time_end_idx: int | None = None,
         stokes_component: str = "I",
+        show_progress: bool = True,
     ) -> GridDataSeries:
+        """Grids the visibilites in a time series so that time steps get
+        gridded individually.
+
+        Parameters
+        ----------
+
+        step_size : int
+            The number of visibilites (time steps) per gridded time step.
+            Meaning that the resulting series will have ``len(Gridder) // step_size``
+            for its length.
+
+        time_start_idx : int, optional
+            The time index at which the time series starts.
+            Default is ``0``, meaning the time series starts at the first visibility.
+
+        time_end : int | None, optional
+            The time index at which the time series end.
+            Default is ``None``, meaning that the time series
+            ends at the last visibility.
+
+        stokes_component : str, optional
+            The Stokes component to grid. Default is ``'I'``.
+
+        show_progress : bool, optional
+            Whether to show a progress bar for the gridding progress.
+            Default is ``True``.
+
+        Returns
+        -------
+
+        GridDataSeries :
+            The series of gridded and ungridded visibilities.
+
+        """
         grid_data = self.stokes[stokes_component]
         grid_data_series = GridDataSeries(
             grid_data=grid_data,
@@ -457,10 +568,16 @@ class Gridder:
             v_wave=self.v_wave,
             times=self.times.mjd,
             step_size=step_size,
-            time_cutoff_idx=time_cutoff_idx,
+            num_frequencies=self.frequencies.size,
+            time_start_idx=time_start_idx,
+            time_end_idx=time_end_idx,
         )
 
-        for idx in tqdm(np.arange(len(grid_data_series)), desc="Gridding time series"):
+        for idx in tqdm(
+            np.arange(len(grid_data_series)),
+            desc="Gridding time series",
+            disable=not show_progress,
+        ):
             u_wave, v_wave = grid_data_series.get_uv_step(step=idx)
 
             grid_data_series.add_grid_data(
@@ -536,14 +653,39 @@ class Gridder:
         else:
             raise ValueError("Expected vis_data to be of dimension 3 or 7")
 
+        if include_array_layout:
+            array = obs.array
+            positions = obs.array_earth_loc.value
+
+            layout = Layout.from_dataframe(
+                df=pd.DataFrame(
+                    {
+                        "station_name": array.st_num,
+                        "x": positions["x"],
+                        "y": positions["y"],
+                        "z": positions["z"],
+                        "dish_dia": array.diam,
+                        "el_low": array.el_low,
+                        "el_high": array.el_high,
+                        "sefd": array.sefd,
+                        "altitude": array.altitude,
+                    }
+                )
+            )
+        else:
+            layout = None
+
         cls = cls(
             u_meter=u_meter.cpu().numpy(),
             v_meter=v_meter.cpu().numpy(),
             times=times,
             img_size=img_size,
             fov=fov,
+            src_ra=obs.ra,
+            src_dec=obs.dec,
             ref_frequency=obs.ref_frequency.cpu().numpy(),
             frequency_offsets=obs.frequency_offsets,
+            antenna_layout=layout,
         )
 
         if isinstance(stokes_components, str):
@@ -647,8 +789,13 @@ class Gridder:
             times=times,
             img_size=img_size,
             fov=fov,
+            src_ra=file[0].header["CRVAL6"] * 3600,
+            src_dec=file[0].header["CRVAL7"] * 3600,
             ref_frequency=file[0].header["CRVAL4"],
             frequency_offsets=file[1].data["IF FREQ"],
+            antenna_layout=Layout.from_uv_fits(path=path)
+            if include_array_layout
+            else None,
         )
 
         cls.stokes["I"] = GridData(vis_data=stokes_i)
@@ -661,7 +808,7 @@ class Gridder:
         path: str,
         img_size: int,
         fov: float,
-        desc_id: int | None = None,
+        desc_id: int,
         ref_frequency_id: int = 0,
         use_calibrated: bool = False,
         filter_flagged: bool = True,
@@ -681,10 +828,13 @@ class Gridder:
         fov: float
             The physical size of the image in asec.
 
-        desc_id: int, optional
-            The desc_id of the visibilites which should be gridded.
-            This can be used to choose the component of a composite observation.
-            Default is ``None``, which means that all observations will be used.
+        desc_id: int
+            The description id of the visibilites which should be gridded.
+            This id corresponds to a way of choosing between the spectral windows
+            of the observation and its polarization setup.
+
+            Note: Currently it is not supported to grid all visibilities of the
+            observation in one image. It is planned to add that at a later point.
 
         ref_frequency_id: int, optional
             The index of the reference frequency that will be used if the measurement
@@ -706,6 +856,10 @@ class Gridder:
 
         main_tab = table(str(path), ack=False)
         spectral_tab = table(str(path / "SPECTRAL_WINDOW"), ack=False)
+        source_table = table(str(path / "SOURCE"), ack=False)
+        data_desc_table = table(str(path / "DATA_DESCRIPTION"), ack=False)
+
+        spw_id = data_desc_table.getcell("SPECTRAL_WINDOW_ID", desc_id)
 
         data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
 
@@ -714,14 +868,12 @@ class Gridder:
 
             main_tab = main_tab.selectrows(rownrs=np.argwhere(mask).ravel())
 
-            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", desc_id)
+            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", spw_id)
             frequency_offsets = (
-                spectral_tab.getcell("CHAN_FREQ", desc_id) - ref_frequency
+                spectral_tab.getcell("CHAN_FREQ", spw_id) - ref_frequency
             )
-
         else:
-            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", 0)
-            frequency_offsets = spectral_tab.getcell("CHAN_FREQ", 0) - ref_frequency
+            pass
 
         data = main_tab.getcol(data_colname)
         uv = main_tab.getcol("UVW")[:, :2]
@@ -751,14 +903,21 @@ class Gridder:
         # Factor 0.5 fixes this for now. Has to be investigated.
         stokes_i *= 0.5
 
+        src_ra, src_dec = np.rad2deg(source_table.getcol("DIRECTION")[0])
+
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
             times=Time(times / 3600 / 24, format="mjd").mjd,
             img_size=img_size,
             fov=fov,
+            src_ra=src_ra,
+            src_dec=src_dec,
             ref_frequency=ref_frequency,
             frequency_offsets=frequency_offsets,
+            antenna_layout=Layout.from_measurement_set(root_path=path, sefd=0)
+            if include_array_layout
+            else None,
         )
 
         cls.stokes["I"] = GridData(vis_data=stokes_i.ravel())

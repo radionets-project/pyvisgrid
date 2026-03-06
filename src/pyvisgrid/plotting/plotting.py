@@ -238,7 +238,7 @@ def plot_ungridded_uv(
     plot_args: dict | None = None,
     fig_args: dict | None = None,
     save_to: str | PathLike | None = None,
-    save_args: dict = None,
+    save_args: dict | None = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
@@ -404,7 +404,7 @@ def plot_mask(
         - ``hist``:     Plots the number of (u,v) points which are sorted in
                         each pixel of the image in the (u,v) space.
 
-        - ``abs``:      Plots the absolute value of the gridded visibilities,
+        - ``abs`` / ``amp``: Plots the absolute value of the gridded visibilities,
                         meaning the magnitude of the complex numbers in Euler
                         representation.
 
@@ -508,6 +508,7 @@ def plot_mask(
     cmap_dict = {
         "hist": "inferno",
         "abs": "viridis",
+        "amp": "viridis",
         "phase": "RdBu",
         "real": "PiYG",
         "imag": "PuOr",
@@ -531,7 +532,7 @@ def plot_mask(
                 mappable=im, ax=ax, fig=fig, label="$(u,v)$ per frequel / 1/fq"
             )
 
-        case "abs":
+        case "abs" | "amp":
             mask_abs, _ = grid_data.get_mask_abs_phase()
             im = ax.imshow(
                 mask_abs,
@@ -541,7 +542,9 @@ def plot_mask(
                 cmap=cmap,
                 **plot_args,
             )
-            _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Amplitude / a.u.")
+            _configure_colorbar(
+                mappable=im, ax=ax, fig=fig, label="Visibility Amplitude / a.u."
+            )
         case "phase":
             _, mask_phase = grid_data.get_mask_abs_phase()
             im = ax.imshow(
@@ -746,11 +749,11 @@ def plot_dirty_image(
             dirty_image = grid_data.dirty_image.real
         case "imag":
             dirty_image = grid_data.dirty_image.imag
-        case "abs":
+        case "abs" | "amp":
             dirty_image = np.abs(grid_data.dirty_image)
         case _:
             raise ValueError(
-                "The given mode does not exist! Valid modes are: real, imag, abs"
+                "The given mode does not exist! Valid modes are: real, imag, abs, amp"
             )
 
     unit = units.Unit(ax_unit)

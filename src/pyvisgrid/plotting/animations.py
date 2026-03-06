@@ -19,9 +19,14 @@ from radiotools.layouts import Layout
 from tqdm.auto import tqdm
 
 if TYPE_CHECKING:
-    from pyvisgrid.core.gridder import GridData, GridDataSeries
+    from pyvisgrid.core.gridder import GridData, GridDataSeries, Gridder
 
-from pyvisgrid.plotting.plotting import _configure_axes, _configure_colorbar, _get_norm
+from pyvisgrid.plotting.plotting import (
+    _apply_crop,
+    _configure_axes,
+    _configure_colorbar,
+    _get_norm,
+)
 
 __all__ = ["plot_earth_layout", "plot_observation_state", "animate_observation"]
 
@@ -358,19 +363,19 @@ def plot_earth_layout(
 
 
 def plot_observation_state(
+    gridder: Gridder,
     vis_data: GridData,
     u: np.ndarray,
     v: np.ndarray,
     times: np.ndarray,
-    src_ra: float,
-    src_dec: float,
-    layout: Layout | str,
     max_values: tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None = None,
     uv_max_extension: float = 0.2,
     plot_positions: list[list[str]] | None = None,
     dirty_image_mode: str = "real",
+    dirty_image_crop: tuple[list[float | None]] = ([None, None], [None, None]),
     mask_mode: str = "amp_phase",
     swap_masks: bool = False,
+    mask_crop: tuple[list[float | None]] = ([None, None], [None, None]),
     axes_options: dict | None = None,
     save_to: str | PathLike | None = None,
     save_args: dict | None = None,
@@ -379,6 +384,9 @@ def plot_observation_state(
 
     Parameters
     ----------
+
+    gridder : Gridder
+        The ``Gridder`` whith which the series was gridded.
 
     vis_data : GridData
         The grid data returned by the Gridder.
@@ -391,17 +399,6 @@ def plot_observation_state(
 
     times : numpy.ndarray
         The MJD timestamps of the :math:`(u,v)` points.
-
-    src_ra : float
-        The Right Ascension (RA) of the source in degrees.
-
-    src_dec : float
-        The Declination (DEC) of the source in degrees.
-
-    layout : radiotools.layouts.Layout | str
-        The interferometer layout to plot. If a string is provided, a valid ``pyvisgen``
-        interferometer layout will be searched at this location. The string therefore
-        has to be a valid path.
 
     max_values : tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None, optional
         The maximum values of the gridded and ungridded data and the timestamps.
@@ -446,9 +443,16 @@ def plot_observation_state(
 
         - ``imag``:     Plots the imaginary part of the dirty image.
 
-        - ``abs``:      Plot the absolute value of the dirty image.
+        - ``abs`` / ``amp``:      Plot the absolute value of the dirty image.
 
         Default is ``real``.
+
+    dirty_image_crop : tuple[list[float | None]], optional
+        The crop of the dirty image. This has to have the format
+        ``([x_left, x_right], [y_left, y_right])``, where the left and right
+        values for each axis are the upper and lower limits of the axes which
+        should be shown.
+        Default is `([None, None], [None, None])`
 
     mask_mode : str, optional
         The mode specifying which representation of the visibility masks should be used.
@@ -466,6 +470,13 @@ def plot_observation_state(
         By default the order is: ``mask_hi = amplitude | real``
         and ``mask_lo = phase | imaginary``.
         Default is ``False``.
+
+    mask_crop : tuple[list[float | None]], optional
+        The crop of the masks. This has to have the format
+        ``([x_left, x_right], [y_left, y_right])``, where the left and right
+        values for each axis are the upper and lower limits of the axes which
+        should be shown.
+        Default is `([None, None], [None, None])`
 
     axes_options : dict | None, optional
         Options for the different subplots of the mosaic plot.
@@ -573,10 +584,10 @@ def plot_observation_state(
 
     if mask_mode == "amp_phase":
         mask_cmaps = ("viridis", "RdBu")
-        mask_labels = ("Amplitude / a.u.", "Phase / rad")
+        mask_labels = ("Visibility Amplitude / a.u.", "Phase / rad")
         mask_norms = ("log", None)
     elif mask_mode == "real_imag":
-        mask_cmaps = ("PiYG", "RdBu")
+        mask_cmaps = ("PiYG", "PuOr")
         mask_labels = ("Real part / a.u.", "Imaginary part / a.u.")
         mask_norms = ("centered", "centered")
     else:
@@ -773,12 +784,12 @@ def plot_observation_state(
                 dirty_image = vis_data.dirty_image.real
             case "imag":
                 dirty_image = vis_data.dirty_image.imag
-            case "abs":
+            case "abs" | "amp":
                 dirty_image = np.abs(vis_data.dirty_image)
             case _:
                 raise ValueError(
                     "The given dirty image mode does not exist! "
-                    "Valid modes are: real, imag, abs"
+                    "Valid modes are: real, imag, abs / amp"
                 )
 
         di_im = ax["di"].imshow(
@@ -828,14 +839,16 @@ def plot_observation_state(
                 labelsize=axes_options["di"]["axes_fontsize"]
             )
 
+        _apply_crop(ax=ax["di"], crop=dirty_image_crop)
+
     else:
         di_im = None
 
     if _is_value_in("earth", plot_positions):
         plot_earth_layout(
-            layout=layout,
-            src_ra=src_ra,
-            src_dec=src_dec,
+            layout=gridder.antenna_layout,
+            src_ra=gridder.src_ra,
+            src_dec=gridder.src_dec,
             current_time=Time(times[-1], format="mjd"),
             show_legend=axes_options["earth"]["show_legend"],
             legend_fontsize=axes_options["earth"]["legend_fontsize"],
@@ -904,6 +917,8 @@ def plot_observation_state(
                 labelsize=axes_options[mask_key]["axes_fontsize"]
             )
 
+        _apply_crop(ax=ax[mask_key], crop=mask_crop)
+
         return mask
 
     plots = {
@@ -934,11 +949,9 @@ def plot_observation_state(
 
 
 def animate_observation(
+    gridder: Gridder,
     series: GridDataSeries,
-    src_ra: float,
-    src_dec: float,
-    layout: Layout | str,
-    interval: int,
+    fps: float,
     save_to: str | PathLike,
     max_values: tuple[GridData, np.ndarray, np.ndarray, np.ndarray] | None = None,
     uv_max_extension: float = 0.2,
@@ -955,22 +968,14 @@ def animate_observation(
     Parameters
     ----------
 
+    gridder : Gridder
+        The ``Gridder`` whith which the series was gridded.
+
     series : GridDataSeries
         The series of gridded observations.
 
-    src_ra : float
-        The Right Ascension (RA) of the source in degrees.
-
-    src_dec : float
-        The Declination (DEC) of the source in degrees.
-
-    layout : radiotools.layouts.Layout | str
-        The interferometer layout to plot. If a string is provided, a valid ``pyvisgen``
-        interferometer layout will be searched at this location. The string therefore
-        has to be a valid path.
-
-    interval : int
-        The interval between two images in milliseconds.
+    fps : float
+        The frame rate for the animation in frames per second.
 
     save_to : str | PathLike
         The path to save the animation to. This has to include the filename and
@@ -1021,7 +1026,7 @@ def animate_observation(
 
         - ``imag``:     Plots the imaginary part of the dirty image.
 
-        - ``abs``:      Plot the absolute value of the dirty image.
+        - ``abs`` / ``amp``:      Plot the absolute value of the dirty image.
 
         Default is ``real``.
 
@@ -1138,18 +1143,16 @@ def animate_observation(
 
     frames = len(series)
 
-    # GridDataSeries[i] = [grid_data, u, v, times]
+    # Format: GridDataSeries[i] = [grid_data, u, v, times]
     init_data = series[1]
     last_data = series[-1]
 
     fig, ax, plots, axes_options = plot_observation_state(
+        gridder=gridder,
         vis_data=init_data[0],
         u=init_data[1],
         v=init_data[2],
         times=init_data[3],
-        src_ra=src_ra,
-        src_dec=src_dec,
-        layout=layout,
         max_values=[last_data[0], last_data[1], last_data[2], last_data[3]],
         uv_max_extension=uv_max_extension,
         plot_positions=plot_positions,
@@ -1189,7 +1192,7 @@ def animate_observation(
                     dirty_image = vis_data.dirty_image.real
                 case "imag":
                     dirty_image = vis_data.dirty_image.imag
-                case "abs":
+                case "abs" | "amp":
                     dirty_image = np.abs(vis_data.dirty_image)
 
             di_im.set_data(dirty_image)
@@ -1219,9 +1222,9 @@ def animate_observation(
         if plots["earth"]:
             current_time = Time(times[-1], format="mjd")
             plot_earth_layout(
-                layout=layout,
-                src_ra=src_ra,
-                src_dec=src_dec,
+                layout=gridder.antenna_layout,
+                src_ra=gridder.src_ra,
+                src_dec=gridder.src_dec,
                 current_time=current_time,
                 show_legend=axes_options["earth"]["show_legend"],
                 show_title=axes_options["earth"]["show_title"],
@@ -1243,13 +1246,13 @@ def animate_observation(
     writer = None
     if save_to.suffix.lower() == ".gif":
         writer = animation.PillowWriter(
-            fps=1 / (interval * 1e-3),
+            fps=fps,
             bitrate=-1,
         )
         writer.setup(fig=fig, outfile=save_to, dpi=dpi)
 
     ani = animation.FuncAnimation(
-        fig=fig, func=update, frames=frames, blit=False, interval=interval
+        fig=fig, func=update, frames=frames, blit=False, interval=1e3 / fps
     )
 
     with tqdm(
