@@ -106,6 +106,9 @@ Cleaned image
 .. image:: ./assets/examples/elias24_example_clean.png
 	:width: 49.5%
 
+Animations
+==========
+
 Acknowledgment
 ==============
 This research made use of the data provided by the DSHARP:

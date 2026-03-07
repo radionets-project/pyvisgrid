@@ -386,7 +386,7 @@ def plot_observation_state(
     ----------
 
     gridder : Gridder
-        The ``Gridder`` whith which the series was gridded.
+        The ``Gridder`` with which the series was gridded.
 
     vis_data : GridData
         The grid data returned by the Gridder.
@@ -959,6 +959,7 @@ def animate_observation(
     dirty_image_mode: str = "real",
     mask_mode: str = "amp_phase",
     swap_masks: bool = False,
+    mask_crop: tuple[list[float | None]] = ([None, None], [None, None]),
     axes_options: dict | None = None,
     show_progress: bool = True,
     dpi: int | str = "figure",
@@ -969,7 +970,7 @@ def animate_observation(
     ----------
 
     gridder : Gridder
-        The ``Gridder`` whith which the series was gridded.
+        The ``Gridder`` with which the series was gridded.
 
     series : GridDataSeries
         The series of gridded observations.
@@ -1046,6 +1047,13 @@ def animate_observation(
         By default the order is: ``mask_hi = amplitude | real`` and
         ``mask_lo = phase | imaginary``.
         Default is ``False``.
+
+    mask_crop : tuple[list[float | None]], optional
+        The crop of the masks. This has to have the format
+        ``([x_left, x_right], [y_left, y_right])``, where the left and right
+        values for each axis are the upper and lower limits of the axes which
+        should be shown.
+        Default is `([None, None], [None, None])`
 
     axes_options : dict | None, optional
         Options for the different subplots of the mosaic plot. The given dictionary will
@@ -1158,6 +1166,7 @@ def animate_observation(
         plot_positions=plot_positions,
         mask_mode=mask_mode,
         swap_masks=swap_masks,
+        mask_crop=mask_crop,
         axes_options=axes_options,
     )
 
