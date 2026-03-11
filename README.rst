@@ -106,16 +106,6 @@ Cleaned image
 .. image:: ./assets/examples/elias24_example_clean.png
 	:width: 49.5%
 
-Animations
-==========
-
-.. raw:: html
-
-	<video width="320" height="240" controls>
-		<source src="assets/examples/animation_full.mp4" type="video/mp4">
-		Your browser does not support the video tag.
-	</video>
-
 Acknowledgment
 ==============
 This research made use of the data provided by the DSHARP:
