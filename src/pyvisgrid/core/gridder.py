@@ -793,7 +793,7 @@ class Gridder:
             src_dec=file[0].header["CRVAL7"] * 3600,
             ref_frequency=file[0].header["CRVAL4"],
             frequency_offsets=file[1].data["IF FREQ"],
-            antenna_layout=Layout.from_uv_fits(path=path)
+            antenna_layout=Layout.from_uv_fits(path=path, sefd=0)
             if include_array_layout
             else None,
         )
