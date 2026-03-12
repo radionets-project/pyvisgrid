@@ -681,10 +681,10 @@ class Gridder:
             times=times,
             img_size=img_size,
             fov=fov,
-            src_ra=obs.ra,
-            src_dec=obs.dec,
+            src_ra=obs.ra.cpu().numpy(),
+            src_dec=obs.dec.cpu().numpy(),
             ref_frequency=obs.ref_frequency.cpu().numpy(),
-            frequency_offsets=obs.frequency_offsets,
+            frequency_offsets=obs.frequency_offsets.cpu().numpy(),
             antenna_layout=layout,
         )
 
