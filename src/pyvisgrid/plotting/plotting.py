@@ -553,8 +553,6 @@ def plot_mask(
                 origin="lower",
                 interpolation="none",
                 cmap=cmap,
-                vmin=-np.pi,
-                vmax=np.pi,
                 **plot_args,
             )
             cbar = _configure_colorbar(
