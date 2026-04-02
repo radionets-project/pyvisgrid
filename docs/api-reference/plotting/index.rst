@@ -10,7 +10,7 @@ Plotting (:mod:`pyvisgrid.plotting`)
 Introduction
 ============
 
-:mod:`pyvisgrid.plotting` contains plotting methods for gridded and ungridded data.
+:mod:`pyvisgrid.plotting` contains plotting and animation methods for gridded and ungridded data.
 
 
 Submodules
@@ -21,6 +21,7 @@ Submodules
   :glob:
 
   plotting
+  animations
 
 Reference/API
 =============
