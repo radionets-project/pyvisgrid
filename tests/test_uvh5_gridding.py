@@ -36,6 +36,8 @@ def mock_data(tmp_path) -> Path:
         freq_bands = np.array([15e9])
         f.create_dataset("frequency_bands", data=freq_bands)
 
+        f.create_dataset("times", data=np.arange(100))
+
         sky_grp = f.create_group("sky")
         sky_grp.create_dataset("SI", data=rng.random((64, 64)))
 
@@ -64,6 +66,8 @@ def mock_data_no_sky(tmp_path) -> Path:
 
         freq_bands = np.array([15e9])
         f.create_dataset("frequency_bands", data=freq_bands)
+
+        f.create_dataset("times", data=np.arange(100))
 
     return output_file
 
