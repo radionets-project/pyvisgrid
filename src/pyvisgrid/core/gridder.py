@@ -419,7 +419,7 @@ class Gridder:
                 size=int(len(unique_st_ids) * station_ids_unavail),
                 replace=False,
             )
-            valid = not np.isin(st_ids, unavail).any(axis=1)
+            valid = ~np.isin(st_ids, unavail).any(axis=1)
 
             vis = hf["visibilities"]
             V11 = np.asarray(vis["V_11"])[valid]
