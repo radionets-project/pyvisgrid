@@ -1,0 +1,1 @@
+Fixed a bug where the dimensions of the visibility data were not checked correctly. This had allowed data with wrong dimensions to pass the check.

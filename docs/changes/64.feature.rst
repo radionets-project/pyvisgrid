@@ -1,0 +1,1 @@
+Added :meth:`pyvisgrid.core.gridder.Gridder.from_uvh5` to the Gridder class. This method allows gridding from `uvh5` files as implemented in pyvisgen. The keyword argument `station_ids_unavail` allows reducing the active antennas, thus reducing the operational capacity of the array without the need for full simulation rerun.
