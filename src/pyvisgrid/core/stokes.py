@@ -12,7 +12,7 @@ __all__ = ["compute_single_stokes_component", "get_stokes_from_vis_data"]
 
 def get_stokes_from_vis_data(
     vis_data: Visibilities, stokes_comp: str, polarization: str
-):
+) -> np.ndarray:
     """Get the Stokes visibility for a given Stokes component
     depending on polarization.
 
@@ -21,10 +21,12 @@ def get_stokes_from_vis_data(
     vis_data : pyvisgen.simulation.Visibilities
         The Visibilities which are the output of the ``pyvisgen.simulation.vis_loop``
         function.
+
     stokes_comp : str
         The name of the Stokes component which should be returned.
         Valid names are: ``'I'``, ``'Q'``, ``'U'``, ``'V'``, ``'I+V'``,
         ``'Q+U'``, ``'Q-U'``, ``'I-V'``.
+
     polarization : str
         The type of polarization which should be considered.
         Valid values are: ``'circular'`` and any value. In case this is not set to
@@ -80,7 +82,7 @@ def compute_single_stokes_component(
     stokes_comp_1: int,
     stokes_comp_2: int,
     sign: str,
-):
+) -> np.ndarray:
     """Computes single stokes components I, Q, U, or V from visibility
     data for gridding.
 
@@ -89,10 +91,13 @@ def compute_single_stokes_component(
     vis_data : :class:`~pyvisgen.simulation.Visibilities`
         :class:`~pyvisgen.simulation.Visibilities` dataclass object
         containing the visibilities measured by the array.
+
     stokes_comp_1 : int
         Index of first stokes visibility.
+
     stokes_comp_2 : int
         Index of second stokes visibility.
+
     sign : str
         Whether to add or subtract ``stokes_comp_1`` and ``stokes_comp_2``.
         Valid values are ``'+'`` or ``'-'``.
@@ -101,6 +106,7 @@ def compute_single_stokes_component(
     -------
     numpy.ndarray
         The visibilities for the specified Stokes component.
+
     """
     if sign not in "+-":
         raise ValueError("'sign' can only be '+' or '-'!")
