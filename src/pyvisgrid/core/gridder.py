@@ -398,6 +398,7 @@ class Gridder:
 
         Setting the ``station_ids_unavail`` keyword argument to a value greater ``0.0``,
         you can reduce the array, without the need to re-simulate the entire dataset:
+
         >>> gridded_vis_reduced = Gridder.from_uvh5(
         ...     "/path/to/example.uvh5",
         ...     fov=0.024,
