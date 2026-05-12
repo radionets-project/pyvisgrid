@@ -423,13 +423,13 @@ class Gridder:
                 size=int(len(unique_st_ids) * station_ids_unavail),
                 replace=False,
             )
-            valid = ~np.isin(st_ids, unavail).any(axis=1)
+            avail = ~np.isin(st_ids, unavail).any(axis=1)
 
             vis = hf["visibilities"]
-            V11 = np.asarray(vis["V_11"])[valid]
-            V22 = np.asarray(vis["V_22"])[valid]
-            V12 = np.asarray(vis["V_12"])[valid]
-            V21 = np.asarray(vis["V_21"])[valid]
+            V11 = np.asarray(vis["V_11"])[avail]
+            V22 = np.asarray(vis["V_22"])[avail]
+            V12 = np.asarray(vis["V_12"])[avail]
+            V21 = np.asarray(vis["V_21"])[avail]
 
             vis_data = np.permute_dims(
                 np.concatenate([V11[None], V22[None], V12[None], V21[None]], axis=0),
@@ -450,8 +450,10 @@ class Gridder:
 
             del V11, V22, V12, V21
 
-            u_meter = np.asarray(hf["uvw"]["u"])[valid]
-            v_meter = np.asarray(hf["uvw"]["v"])[valid]
+            u_meter = np.asarray(hf["uvw"]["u"])[avail]
+            v_meter = np.asarray(hf["uvw"]["v"])[avail]
+
+            times = np.asarray(hf["times"])[avail]
 
             if not img_size:
                 try:
@@ -469,7 +471,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
-            times=-1,  # NOTE: For now, uvh5 does not contain timestamps, may be changed
+            times=times,
             img_size=img_size,
             fov=fov,
             ref_frequency=ref_frequency,
@@ -500,9 +502,6 @@ class Gridder:
             except AxisError:
                 stokes_vis = stokes_vis.ravel()
 
-            # FIXME: probably some kind of difference in normalization.
-            # Factor 2 fixes this for now. Has to be investigated.
-            stokes_vis *= 2
             cls.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
 
         return cls
