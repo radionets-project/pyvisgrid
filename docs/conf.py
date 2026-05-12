@@ -181,6 +181,7 @@ intersphinx_mapping = {
     "rich": ("https://rich.readthedocs.io/en/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
     "torch": ("https://pytorch.org/docs/stable/", None),
+    "pyvisgen": ("https://pyvisgen.readthedocs.io/en/latest/", None),
 }
 
 

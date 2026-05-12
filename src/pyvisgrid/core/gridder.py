@@ -407,6 +407,12 @@ class Gridder:
         >>> gridded_vis_reduced.vis_data.shape
         (288,)
 
+        Note that this only disables a randomized selection of antennas for the
+        entire observation. Depending on the visibility of the source, the data taken
+        by the antennas may vary during measurement, and the resulting visibilites
+        dataset may be smaller or larger than expected (see, e.g., the shapes
+        ``(1344,)`` vs ``(288,)`` although only half of the antennas were unavailable).
+
         See Also
         --------
         :class:`~pyvisgen.io.datawriters.UVH5Writer` : The `UVH5` data writer
