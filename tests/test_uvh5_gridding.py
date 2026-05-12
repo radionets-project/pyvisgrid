@@ -160,5 +160,3 @@ class TestUVH5Gridding:
         assert gridder["I"].dirty_image is not None
 
         assert len(gridder["I"].vis_data) < len(full_gridder["I"].vis_data)
-
-
