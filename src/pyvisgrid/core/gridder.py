@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import h5py
 import numpy as np
 from astropy.constants import c
 from astropy.io import fits
@@ -344,25 +345,92 @@ class Gridder:
         return cls
 
     @classmethod
-    def from_uvh5(cls, file, fov, stokes_components="I", polarizations=None, stations_unavail=1.0):
+    def from_uvh5(
+        cls,
+        file: str | Path,
+        *,
+        fov: float,
+        stokes_components: str | list[str] = "I",
+        polarizations: str | list[str] | None = None,
+        station_ids_unavail: float = 0.0,
+        img_size: int | None = None,
+    ):
+        """Initializes the gridder with visibility data from the UVH5 file format.
+
+        This method allows to select stokes components that will be computed
+        for a given polarization.
+
+        Parameters
+        ----------
+        file : str or :class:`~pathlib.Path`
+            Path to the file that you want to grid. This file has to be
+            in the UVH5 file format from pyvisgen.
+        fov : float
+            The physical size of the image in asec.
+        stokes_components : str | list[str], optional
+            The Stokes components which are to be calculated and saved in the gridder.
+            This can either be a list of components (e.g. ``['I', 'V']``) or a single
+            string. Default: ``'I'``.
+        polarizations : str | list[str] | None, optional
+            The polarization type. Default: ``None``.
+        station_ids_unavail : float, optional
+            Percentage of station ids that are unavailable during the observation.
+            This allows simulating reduced operation capacity even after the main
+            simulation in pyvisgen and thus avoids having to rerun the same simulation
+            with different reduced arrays. Default: ``0.0``
+        img_size : int or None, optional
+            Image size is read from the file. In case the image size cannot be
+            read, e.g. because the sky image was not saved to the file ("file/sky/SI"),
+            or you want to grid the image to a different size, it can be set
+            through this keyword argument. Default: ``None``
+
+        Examples
+        --------
+        >>> gridded_vis = Gridder.from_uvh5(
+        ...     "/path/to/example.uvh5",
+        ...     fov=0.024,
+        ... ).grid()
+        >>> gridded_vis.vis_data.shape
+        (1344,)
+
+        Setting the ``station_ids_unavail`` keyword argument to a value greater ``0.0``,
+        you can reduce the array, without the need to re-simulate the entire dataset:
+        >>> gridded_vis_reduced = Gridder.from_uvh5(
+        ...     "/path/to/example.uvh5",
+        ...     fov=0.024,
+        ...     station_ids_unavail=0.5,
+        ... ).grid()
+        >>> gridded_vis_reduced.vis_data.shape
+        (288,)
+
+        See Also
+        --------
+        :class:`~pyvisgen.io.datawriters.UVH5Writer` : The `UVH5` data writer
+            class as implemented in :mod:`pyvisgen`, outlining the file structure.
+        """
         rng = np.random.default_rng()
-        
+
         with h5py.File(file) as hf:
             st_ids = np.asarray(hf["uvw"]["st_id_pairs"])
             unique_st_ids = np.unique(st_ids)
-            
-            unavail = rng.choice(unique_st_ids, size=int(len(unique_st_ids) * stations_unavail), replace=False)
-            valid = ~(np.isin(st_pairs, unavail).any(axis=1) == True)
-            
+
+            unavail = rng.choice(
+                unique_st_ids,
+                size=int(len(unique_st_ids) * station_ids_unavail),
+                replace=False,
+            )
+            valid = not np.isin(st_ids, unavail).any(axis=1)
+
             vis = hf["visibilities"]
             V11 = np.asarray(vis["V_11"])[valid]
             V22 = np.asarray(vis["V_22"])[valid]
             V12 = np.asarray(vis["V_12"])[valid]
             V21 = np.asarray(vis["V_21"])[valid]
-            
-            vis_data = np.permute_dims(np.concatenate(
-                [V11[None], V22[None], V12[None], V21[None]], axis=0
-            ), axes=(1, 2, 0))
+
+            vis_data = np.permute_dims(
+                np.concatenate([V11[None], V22[None], V12[None], V21[None]], axis=0),
+                axes=(1, 2, 0),
+            )
 
             if vis_data.ndim != 7:
                 if vis_data.ndim == 3:
@@ -371,14 +439,21 @@ class Gridder:
                         axis=3,
                     )[:, None, None, :, None, ...]
             else:
-                raise ValueError("Expected vis_data to be of dimension 3 or 7")
+                raise RuntimeError("Expected vis_data to be of dimension 3 or 7")
 
             del V11, V22, V12, V21
 
             u_meter = np.asarray(hf["uvw"]["u"])[valid]
             v_meter = np.asarray(hf["uvw"]["v"])[valid]
 
-            img_size = hf["sky"]["SI"].shape[-1]
+            if not img_size:
+                try:
+                    img_size = hf["sky"]["SI"].shape[-1]
+                except KeyError as e:
+                    raise RuntimeError(
+                        f"'img_size' could not be read from {file}. Please use the "
+                        "'img_size' keyword argument instead."
+                    ) from e
 
             frequency_bands = np.asarray(hf["frequency_bands"])
             ref_frequency = frequency_bands[0]
@@ -387,7 +462,7 @@ class Gridder:
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
-            times=-1,  # for now, uvh5 does not contain timestamps
+            times=-1,  # NOTE: For now, uvh5 does not contain timestamps, may be changed
             img_size=img_size,
             fov=fov,
             ref_frequency=ref_frequency,
