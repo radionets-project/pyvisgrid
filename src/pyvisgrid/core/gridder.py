@@ -300,8 +300,11 @@ class Gridder:
                     [vis_data.real, vis_data.imag, np.ones(vis_data.shape)],
                     axis=3,
                 )[:, None, None, :, None, ...]
-        else:
-            raise ValueError("Expected vis_data to be of dimension 3 or 7")
+            else:
+                raise RuntimeError(
+                    "Expected vis_data to be of dimension 3 or 7 but got"
+                    f"{vis_data.ndim}"
+                )
 
         cls = cls(
             u_meter=u_meter.cpu().numpy(),
@@ -439,7 +442,10 @@ class Gridder:
                         axis=3,
                     )[:, None, None, :, None, ...]
                 else:
-                    raise RuntimeError("Expected vis_data to be of dimension 3 or 7")
+                    raise RuntimeError(
+                        "Expected vis_data to be of dimension 3 or 7 but got"
+                        f"{vis_data.ndim}"
+                    )
 
             del V11, V22, V12, V21
 
