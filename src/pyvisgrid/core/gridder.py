@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import h5py
 import numpy as np
 from astropy.constants import c
 from astropy.io import fits
@@ -299,8 +300,11 @@ class Gridder:
                     [vis_data.real, vis_data.imag, np.ones(vis_data.shape)],
                     axis=3,
                 )[:, None, None, :, None, ...]
-        else:
-            raise ValueError("Expected vis_data to be of dimension 3 or 7")
+            else:
+                raise RuntimeError(
+                    "Expected vis_data to be of dimension 3 or 7 but got"
+                    f"{vis_data.ndim}"
+                )
 
         cls = cls(
             u_meter=u_meter.cpu().numpy(),
@@ -339,6 +343,171 @@ class Gridder:
             # FIXME: probably some kind of difference in normalization.
             # Factor 2 fixes this for now. Has to be investigated.
             stokes_vis *= 2
+            cls.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
+
+        return cls
+
+    @classmethod
+    def from_uvh5(
+        cls,
+        file: str | Path,
+        *,
+        fov: float,
+        stokes_components: str | list[str] = "I",
+        polarizations: str | list[str] | None = None,
+        station_ids_unavail: float = 0.0,
+        img_size: int | None = None,
+    ):
+        """Initializes the gridder with visibility data from the UVH5 file format.
+
+        This method allows to select stokes components that will be computed
+        for a given polarization.
+
+        Parameters
+        ----------
+        file : str or :class:`~pathlib.Path`
+            Path to the file that you want to grid. This file has to be
+            in the UVH5 file format from pyvisgen.
+        fov : float
+            The physical size of the image in asec.
+        stokes_components : str | list[str], optional
+            The Stokes components which are to be calculated and saved in the gridder.
+            This can either be a list of components (e.g. ``['I', 'V']``) or a single
+            string. Default: ``'I'``.
+        polarizations : str | list[str] | None, optional
+            The polarization type. Default: ``None``.
+        station_ids_unavail : float, optional
+            Percentage of station ids that are unavailable during the observation.
+            This allows simulating reduced operation capacity even after the main
+            simulation in pyvisgen and thus avoids having to rerun the same simulation
+            with different reduced arrays. Default: ``0.0``
+        img_size : int or None, optional
+            Image size is read from the file. In case the image size cannot be
+            read, e.g. because the sky image was not saved to the file ("file/sky/SI"),
+            or you want to grid the image to a different size, it can be set
+            through this keyword argument. Default: ``None``
+
+        Examples
+        --------
+        >>> gridded_vis = Gridder.from_uvh5(
+        ...     "/path/to/example.uvh5",
+        ...     fov=0.024,
+        ... ).grid()
+        >>> gridded_vis.vis_data.shape
+        (1344,)
+
+        Setting the ``station_ids_unavail`` keyword argument to a value greater ``0.0``,
+        you can reduce the array, without the need to re-simulate the entire dataset:
+
+        >>> gridded_vis_reduced = Gridder.from_uvh5(
+        ...     "/path/to/example.uvh5",
+        ...     fov=0.024,
+        ...     station_ids_unavail=0.5,
+        ... ).grid()
+        >>> gridded_vis_reduced.vis_data.shape
+        (288,)
+
+        Note that this only disables a randomized selection of antennas for the
+        entire observation. Depending on the visibility of the source, the data taken
+        by the antennas may vary during measurement, and the resulting visibilites
+        dataset may be smaller or larger than expected (see, e.g., the shapes
+        ``(1344,)`` vs ``(288,)`` although only half of the antennas were unavailable).
+
+        See Also
+        --------
+        :class:`~pyvisgen.io.datawriters.UVH5Writer` : The `UVH5` data writer
+            class as implemented in :mod:`pyvisgen`, outlining the file structure.
+        """
+        rng = np.random.default_rng()
+
+        with h5py.File(file) as hf:
+            st_ids = np.asarray(hf["uvw"]["st_id_pairs"])
+            unique_st_ids = np.unique(st_ids)
+
+            unavail = rng.choice(
+                unique_st_ids,
+                size=int(len(unique_st_ids) * station_ids_unavail),
+                replace=False,
+            )
+            avail = ~np.isin(st_ids, unavail).any(axis=1)
+
+            vis = hf["visibilities"]
+            V11 = np.asarray(vis["V_11"])[avail]
+            V22 = np.asarray(vis["V_22"])[avail]
+            V12 = np.asarray(vis["V_12"])[avail]
+            V21 = np.asarray(vis["V_21"])[avail]
+
+            vis_data = np.permute_dims(
+                np.concatenate([V11[None], V22[None], V12[None], V21[None]], axis=0),
+                axes=(1, 2, 0),
+            )
+
+            if vis_data.ndim != 7:
+                if vis_data.ndim == 3:
+                    vis_data = np.stack(
+                        [vis_data.real, vis_data.imag, np.ones(vis_data.shape)],
+                        axis=3,
+                    )[:, None, None, :, None, ...]
+                else:
+                    raise RuntimeError(
+                        "Expected vis_data to be of dimension 3 or 7 but got"
+                        f"{vis_data.ndim}"
+                    )
+
+            del V11, V22, V12, V21
+
+            u_meter = np.asarray(hf["uvw"]["u"])[avail]
+            v_meter = np.asarray(hf["uvw"]["v"])[avail]
+
+            times = np.asarray(hf["times"])[avail]
+
+            if not img_size:
+                try:
+                    img_size = hf["sky"]["SI"].shape[-1]
+                except KeyError as e:
+                    raise RuntimeError(
+                        f"'img_size' could not be read from {file}. Please use the "
+                        "'img_size' keyword argument instead."
+                    ) from e
+
+            frequency_bands = np.asarray(hf["frequency_bands"])
+            ref_frequency = frequency_bands[0]
+            frequency_offsets = frequency_bands - ref_frequency
+
+        cls = cls(
+            u_meter=u_meter,
+            v_meter=v_meter,
+            times=times,
+            img_size=img_size,
+            fov=fov,
+            ref_frequency=ref_frequency,
+            frequency_offsets=frequency_offsets,
+        )
+
+        if isinstance(stokes_components, str):
+            stokes_components = [stokes_components]
+
+        if polarizations is None:
+            polarizations = ""
+
+        if isinstance(polarizations, str):
+            polarizations = [polarizations]
+
+        if len(stokes_components) != len(polarizations):
+            raise IndexError(
+                "The length of stokes_components has to be equal "
+                "to the length of polarizations!"
+            )
+
+        for stokes_comp, polarization in zip(stokes_components, polarizations):
+            # get stokes visibilities depending on stokes component to grid
+            # and polarization mode
+            stokes_vis = get_stokes_from_vis_data(vis_data, stokes_comp, polarization)
+            try:
+                stokes_vis = stokes_vis.swapaxes(0, 1).ravel()
+            except AxisError:
+                stokes_vis = stokes_vis.ravel()
+
             cls.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
 
         return cls
