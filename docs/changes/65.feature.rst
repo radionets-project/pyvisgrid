@@ -1,0 +1,1 @@
+Added ra/dec readout for uvh5 files to comply with Gridder class and new UVH5 file structure
