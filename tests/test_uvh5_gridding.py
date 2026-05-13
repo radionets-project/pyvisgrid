@@ -38,6 +38,10 @@ def mock_data(tmp_path) -> Path:
 
         f.create_dataset("times", data=np.arange(100))
 
+        obs_grp = f.create_group("obs")
+        obs_grp.create_dataset("ra", data=rng.integers(0, 180, 1))
+        obs_grp.create_dataset("dec", data=rng.integers(0, 90, 1))
+
         sky_grp = f.create_group("sky")
         sky_grp.create_dataset("SI", data=rng.random((64, 64)))
 
@@ -68,6 +72,10 @@ def mock_data_no_sky(tmp_path) -> Path:
         f.create_dataset("frequency_bands", data=freq_bands)
 
         f.create_dataset("times", data=np.arange(100))
+
+        obs_grp = f.create_group("obs")
+        obs_grp.create_dataset("ra", data=rng.integers(0, 180, 1))
+        obs_grp.create_dataset("dec", data=rng.integers(0, 90, 1))
 
     return output_file
 
