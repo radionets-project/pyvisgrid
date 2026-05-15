@@ -850,6 +850,9 @@ class Gridder:
             ref_frequency = frequency_bands[0]
             frequency_offsets = frequency_bands - ref_frequency
 
+            ra = np.float64(hf["obs"]["ra"])
+            dec = np.float64(hf["obs"]["dec"])
+
         cls = cls(
             u_meter=u_meter,
             v_meter=v_meter,
@@ -858,6 +861,8 @@ class Gridder:
             fov=fov,
             ref_frequency=ref_frequency,
             frequency_offsets=frequency_offsets,
+            src_ra=ra,
+            src_dec=dec,
         )
 
         if isinstance(stokes_components, str):
