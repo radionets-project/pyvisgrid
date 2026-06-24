@@ -12,6 +12,7 @@ from astropy.time import Time
 from casacore.tables import table
 from numpy.exceptions import AxisError
 from numpy.typing import ArrayLike
+from torch import Tensor
 from tqdm.auto import tqdm
 
 if TYPE_CHECKING:
@@ -644,6 +645,9 @@ class Gridder:
         ).mjd
 
         vis_data = vis_data.get_values()
+
+        if isinstance(vis_data, Tensor) and vis_data.device.type != "cpu":
+            vis_data = vis_data.detach().cpu().numpy()
 
         if vis_data.ndim != 7:
             if vis_data.ndim == 3:
