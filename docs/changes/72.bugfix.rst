@@ -1,0 +1,3 @@
+Added cartopy and mergedeep dependencies.
+
+Fixed a bug in `Gridder.from_pyvisgen` that would raise an exception when `vis_data` was a Tensor and on a different device than `cpu`.
