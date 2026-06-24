@@ -1,0 +1,2 @@
+* Make animations module mandatory
+* Move dependencies of animations module from optional to mandatory
