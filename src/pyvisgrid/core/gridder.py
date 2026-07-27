@@ -29,10 +29,10 @@ except ImportError:
     include_array_layout = False
 
 
-import pyvisgrid.plotting as plotting
+from pyvisgrid import plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
 
-__all__ = ["GridData", "Gridder", "GridDataSeries"]
+__all__ = ["GridData", "GridDataSeries", "Gridder"]
 
 
 @dataclass
