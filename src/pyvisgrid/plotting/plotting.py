@@ -4,10 +4,10 @@ import warnings
 from os import PathLike
 from typing import TYPE_CHECKING
 
-import astropy.units as units
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+from astropy import units
 from astropy.time import Time
 from matplotlib.ticker import NullFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -15,13 +15,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 if TYPE_CHECKING:
     from pyvisgrid.core.gridder import Gridder
 
-__all__ = ["plot_ungridded_uv", "plot_dirty_image", "plot_mask"]
+__all__ = ["plot_dirty_image", "plot_mask", "plot_ungridded_uv"]
 
 
 def _configure_axes(
     fig: matplotlib.figure.Figure | None,
     ax: matplotlib.axes.Axes | None,
-    fig_args: dict = None,
+    fig_args: dict | None = None,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Configures figure and axis depending if they were given
     as parameters.
