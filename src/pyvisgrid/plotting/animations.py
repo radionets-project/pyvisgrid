@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib as mpl
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units
 from astropy.coordinates import ITRS, SkyCoord
 from astropy.time import Time
 from cartopy.feature.nightshade import Nightshade
+from matplotlib import animation
 from mergedeep import merge
 from radiotools.layouts import Layout
 from tqdm.auto import tqdm
@@ -28,7 +28,7 @@ from pyvisgrid.plotting.plotting import (
     _get_norm,
 )
 
-__all__ = ["plot_earth_layout", "plot_observation_state", "animate_observation"]
+__all__ = ["animate_observation", "plot_earth_layout", "plot_observation_state"]
 
 _default_colors = mpl.colormaps["inferno"].resampled(10).colors
 
