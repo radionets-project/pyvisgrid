@@ -593,6 +593,211 @@ class Gridder:
         return grid_data_series
 
     @classmethod
+    def from_fits(
+        cls,
+        path: str,
+        img_size: int,
+        fov: float,
+        uv_colnames: dict | None = None,
+    ) -> Gridder:
+        """Initializes the gridder with the visibility data in a
+        given FITS file using the default Gridder for the radionets-project.
+        Currently only extraction of the Stokes I component is supported.
+        More on the ``Gridder`` can be found in the constructor of
+        the ``Gridder``.
+
+        Parameters
+        ----------
+        path : str
+            The path to the FITS file.
+
+        img_size : int
+            The size of the image in pixels.
+
+        fov : float
+            The physical size of the image in asec.
+
+        uv_colnames : dict, optional
+            Alternative names for the U and V columns in the FITS file.
+            Default is {'u': None, 'v': None}, meaning the default values of
+            'UU' and 'VV' or 'UU--' and 'VV--' will be used.
+        """
+        if uv_colnames is None:
+            uv_colnames = dict(u=None, v=None)
+
+        path = Path(path)
+        file = fits.open(path)
+
+        data = file[0].data.T
+
+        if uv_colnames["u"] is None and uv_colnames["v"] is None:
+            try:
+                u_meter = data["UU"].T * c.value
+                v_meter = data["VV"].T * c.value
+            except KeyError:
+                u_meter = data["UU--"].T * c.value
+                v_meter = data["VV--"].T * c.value
+        elif (uv_colnames["u"] is None and uv_colnames["v"] is not None) or (
+            uv_colnames["u"] is not None and uv_colnames["v"] is None
+        ):
+            raise KeyError(
+                "When providing specific column names, "
+                "both the names for u and v have to be set!"
+            )
+        else:
+            u_meter = data[uv_colnames[0]].T * c.value
+            v_meter = data[uv_colnames[1]].T * c.value
+
+        times = Time(data["DATE"], format="jd").mjd
+
+        vis = file[0].data["DATA"]
+        stokes_i = (
+            (vis[..., 0, 0] + 1j * vis[..., 0, 1])
+            + (vis[..., 1, 0] + 1j * vis[..., 1, 1])
+        ).ravel()[:, None]
+
+        instance = cls(
+            u_meter=u_meter,
+            v_meter=v_meter,
+            times=times,
+            img_size=img_size,
+            fov=fov,
+            src_ra=file[0].header["CRVAL6"] * 3600,
+            src_dec=file[0].header["CRVAL7"] * 3600,
+            ref_frequency=file[0].header["CRVAL4"],
+            frequency_offsets=file[1].data["IF FREQ"],
+            antenna_layout=Layout.from_uv_fits(path=path, sefd=0)
+            if include_array_layout
+            else None,
+        )
+
+        instance.stokes["I"] = GridData(vis_data=stokes_i)
+
+        return instance
+
+    @classmethod
+    def from_ms(
+        cls,
+        path: str,
+        img_size: int,
+        fov: float,
+        desc_id: int,
+        ref_frequency_id: int = 0,
+        use_calibrated: bool = False,
+        filter_flagged: bool = True,
+    ) -> Gridder:
+        """Initializes the Gridder with a measurement which is saved in an
+        NRAO CASA Measurement Set. Currently only extraction of the Stokes I
+        component is supported.
+
+        Parameters
+        ----------
+        path: str
+            The path of the measurement set root directory.
+
+        img_size: int
+            The size of the image in pixels.
+
+        fov: float
+            The physical size of the image in asec.
+
+        desc_id: int
+            The description id of the visibilites which should be gridded.
+            This id corresponds to a way of choosing between the spectral windows
+            of the observation and its polarization setup.
+
+            Note: Currently it is not supported to grid all visibilities of the
+            observation in one image. It is planned to add that at a later point.
+
+        ref_frequency_id: int, optional
+            The index of the reference frequency that will be used if the measurement
+            is a composite observation and no desc_id is given.
+
+        use_calibrated: bool, optional
+            Whether to use the calibrated data from the MODEL_DATA column or the
+            raw data from the DATA column. Default is ``True``.
+
+        filter_flagged: bool, optional
+            Whether to filter out flagged data rows. Default is ``True``.
+        """
+        path = Path(path)
+
+        if not path.is_dir():
+            raise NotADirectoryError(
+                f"This measurement set does not exist under the path {path}"
+            )
+
+        main_tab = table(str(path), ack=False)
+        spectral_tab = table(str(path / "SPECTRAL_WINDOW"), ack=False)
+        source_table = table(str(path / "SOURCE"), ack=False)
+        data_desc_table = table(str(path / "DATA_DESCRIPTION"), ack=False)
+
+        spw_id = data_desc_table.getcell("SPECTRAL_WINDOW_ID", desc_id)
+
+        data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
+
+        if desc_id is not None:
+            mask = main_tab.getcol("DATA_DESC_ID") == desc_id
+
+            main_tab = main_tab.selectrows(rownrs=np.argwhere(mask).ravel())
+
+            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", spw_id)
+            frequency_offsets = (
+                spectral_tab.getcell("CHAN_FREQ", spw_id) - ref_frequency
+            )
+        else:
+            pass
+
+        data = main_tab.getcol(data_colname)
+        uv = main_tab.getcol("UVW")[:, :2]
+        times = main_tab.getcol("TIME")
+
+        if filter_flagged:
+            flag_mask = main_tab.getcol("FLAG")
+            flag_mask = flag_mask.reshape((flag_mask.shape[0], -1)).astype(np.uint8)
+            flag_mask = np.prod(flag_mask, axis=1)
+
+            flag_mask = np.logical_not(flag_mask.astype(bool))
+
+        else:
+            flag_mask = np.ones(uv.shape[0]).astype(bool)
+
+        uv = uv[flag_mask]
+        data = data[flag_mask]
+        times = times[flag_mask]
+
+        u_meter = uv[:, 0]
+        v_meter = uv[:, 1]
+
+        stokes_i = data[..., 0] + data[..., 1]
+        stokes_i = stokes_i.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
+
+        # FIXME: probably some kind of difference in normalization.
+        # Factor 0.5 fixes this for now. Has to be investigated.
+        stokes_i *= 0.5
+
+        src_ra, src_dec = np.rad2deg(source_table.getcol("DIRECTION")[0])
+
+        instance = cls(
+            u_meter=u_meter,
+            v_meter=v_meter,
+            times=Time(times / 3600 / 24, format="mjd").mjd,
+            img_size=img_size,
+            fov=fov,
+            src_ra=src_ra,
+            src_dec=src_dec,
+            ref_frequency=ref_frequency,
+            frequency_offsets=frequency_offsets,
+            antenna_layout=Layout.from_measurement_set(root_path=path, sefd=0)
+            if include_array_layout
+            else None,
+        )
+
+        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel())
+
+        return instance
+
+    @classmethod
     def from_pyvisgen(
         cls,
         vis_data: Visibilities,
@@ -601,7 +806,7 @@ class Gridder:
         fov: float,
         stokes_components: list[str] | str = "I",
         polarizations: list[str] | str | None = None,
-    ) -> GridData:
+    ) -> Gridder:
         """Initializes the gridder with the visibility data which is generated by the
         ``pyvisgen.simulation.vis_loop`` function.
         Additionally one can define which stokes components should be calculated
@@ -737,7 +942,7 @@ class Gridder:
         polarizations: str | list[str] | None = None,
         station_ids_unavail: float = 0.0,
         img_size: int | None = None,
-    ):
+    ) -> Gridder:
         """Initializes the gridder with visibility data from the UVH5 file format.
 
         This method allows to select stokes components that will be computed
@@ -894,211 +1099,6 @@ class Gridder:
                 stokes_vis = stokes_vis.ravel()
 
             instance.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
-
-        return instance
-
-    @classmethod
-    def from_fits(
-        cls,
-        path: str,
-        img_size: int,
-        fov: float,
-        uv_colnames: dict | None = None,
-    ) -> GridData:
-        """Initializes the gridder with the visibility data in a
-        given FITS file using the default Gridder for the radionets-project.
-        Currently only extraction of the Stokes I component is supported.
-        More on the ``Gridder`` can be found in the constructor of
-        the ``Gridder``.
-
-        Parameters
-        ----------
-        path : str
-            The path to the FITS file.
-
-        img_size : int
-            The size of the image in pixels.
-
-        fov : float
-            The physical size of the image in asec.
-
-        uv_colnames : dict, optional
-            Alternative names for the U and V columns in the FITS file.
-            Default is {'u': None, 'v': None}, meaning the default values of
-            'UU' and 'VV' or 'UU--' and 'VV--' will be used.
-        """
-        if uv_colnames is None:
-            uv_colnames = dict(u=None, v=None)
-
-        path = Path(path)
-        file = fits.open(path)
-
-        data = file[0].data.T
-
-        if uv_colnames["u"] is None and uv_colnames["v"] is None:
-            try:
-                u_meter = data["UU"].T * c.value
-                v_meter = data["VV"].T * c.value
-            except KeyError:
-                u_meter = data["UU--"].T * c.value
-                v_meter = data["VV--"].T * c.value
-        elif (uv_colnames["u"] is None and uv_colnames["v"] is not None) or (
-            uv_colnames["u"] is not None and uv_colnames["v"] is None
-        ):
-            raise KeyError(
-                "When providing specific column names, "
-                "both the names for u and v have to be set!"
-            )
-        else:
-            u_meter = data[uv_colnames[0]].T * c.value
-            v_meter = data[uv_colnames[1]].T * c.value
-
-        times = Time(data["DATE"], format="jd").mjd
-
-        vis = file[0].data["DATA"]
-        stokes_i = (
-            (vis[..., 0, 0] + 1j * vis[..., 0, 1])
-            + (vis[..., 1, 0] + 1j * vis[..., 1, 1])
-        ).ravel()[:, None]
-
-        instance = cls(
-            u_meter=u_meter,
-            v_meter=v_meter,
-            times=times,
-            img_size=img_size,
-            fov=fov,
-            src_ra=file[0].header["CRVAL6"] * 3600,
-            src_dec=file[0].header["CRVAL7"] * 3600,
-            ref_frequency=file[0].header["CRVAL4"],
-            frequency_offsets=file[1].data["IF FREQ"],
-            antenna_layout=Layout.from_uv_fits(path=path, sefd=0)
-            if include_array_layout
-            else None,
-        )
-
-        instance.stokes["I"] = GridData(vis_data=stokes_i)
-
-        return instance
-
-    @classmethod
-    def from_ms(
-        cls,
-        path: str,
-        img_size: int,
-        fov: float,
-        desc_id: int,
-        ref_frequency_id: int = 0,
-        use_calibrated: bool = False,
-        filter_flagged: bool = True,
-    ) -> GridData:
-        """Initializes the Gridder with a measurement which is saved in an
-        NRAO CASA Measurement Set. Currently only extraction of the Stokes I
-        component is supported.
-
-        Parameters
-        ----------
-        path: str
-            The path of the measurement set root directory.
-
-        img_size: int
-            The size of the image in pixels.
-
-        fov: float
-            The physical size of the image in asec.
-
-        desc_id: int
-            The description id of the visibilites which should be gridded.
-            This id corresponds to a way of choosing between the spectral windows
-            of the observation and its polarization setup.
-
-            Note: Currently it is not supported to grid all visibilities of the
-            observation in one image. It is planned to add that at a later point.
-
-        ref_frequency_id: int, optional
-            The index of the reference frequency that will be used if the measurement
-            is a composite observation and no desc_id is given.
-
-        use_calibrated: bool, optional
-            Whether to use the calibrated data from the MODEL_DATA column or the
-            raw data from the DATA column. Default is ``True``.
-
-        filter_flagged: bool, optional
-            Whether to filter out flagged data rows. Default is ``True``.
-        """
-        path = Path(path)
-
-        if not path.is_dir():
-            raise NotADirectoryError(
-                f"This measurement set does not exist under the path {path}"
-            )
-
-        main_tab = table(str(path), ack=False)
-        spectral_tab = table(str(path / "SPECTRAL_WINDOW"), ack=False)
-        source_table = table(str(path / "SOURCE"), ack=False)
-        data_desc_table = table(str(path / "DATA_DESCRIPTION"), ack=False)
-
-        spw_id = data_desc_table.getcell("SPECTRAL_WINDOW_ID", desc_id)
-
-        data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
-
-        if desc_id is not None:
-            mask = main_tab.getcol("DATA_DESC_ID") == desc_id
-
-            main_tab = main_tab.selectrows(rownrs=np.argwhere(mask).ravel())
-
-            ref_frequency = spectral_tab.getcell("REF_FREQUENCY", spw_id)
-            frequency_offsets = (
-                spectral_tab.getcell("CHAN_FREQ", spw_id) - ref_frequency
-            )
-        else:
-            pass
-
-        data = main_tab.getcol(data_colname)
-        uv = main_tab.getcol("UVW")[:, :2]
-        times = main_tab.getcol("TIME")
-
-        if filter_flagged:
-            flag_mask = main_tab.getcol("FLAG")
-            flag_mask = flag_mask.reshape((flag_mask.shape[0], -1)).astype(np.uint8)
-            flag_mask = np.prod(flag_mask, axis=1)
-
-            flag_mask = np.logical_not(flag_mask.astype(bool))
-
-        else:
-            flag_mask = np.ones(uv.shape[0]).astype(bool)
-
-        uv = uv[flag_mask]
-        data = data[flag_mask]
-        times = times[flag_mask]
-
-        u_meter = uv[:, 0]
-        v_meter = uv[:, 1]
-
-        stokes_i = data[..., 0] + data[..., 1]
-        stokes_i = stokes_i.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
-
-        # FIXME: probably some kind of difference in normalization.
-        # Factor 0.5 fixes this for now. Has to be investigated.
-        stokes_i *= 0.5
-
-        src_ra, src_dec = np.rad2deg(source_table.getcol("DIRECTION")[0])
-
-        instance = cls(
-            u_meter=u_meter,
-            v_meter=v_meter,
-            times=Time(times / 3600 / 24, format="mjd").mjd,
-            img_size=img_size,
-            fov=fov,
-            src_ra=src_ra,
-            src_dec=src_dec,
-            ref_frequency=ref_frequency,
-            frequency_offsets=frequency_offsets,
-            antenna_layout=Layout.from_measurement_set(root_path=path, sefd=0)
-            if include_array_layout
-            else None,
-        )
-
-        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel())
 
         return instance
 
