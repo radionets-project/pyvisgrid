@@ -21,7 +21,7 @@ __all__ = ["plot_dirty_image", "plot_mask", "plot_ungridded_uv"]
 def _configure_axes(
     fig: matplotlib.figure.Figure | None,
     ax: matplotlib.axes.Axes | None,
-    fig_args: dict = None,
+    fig_args: dict | None = None,
 ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
     """Configures figure and axis depending if they were given
     as parameters.

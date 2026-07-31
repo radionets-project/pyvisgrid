@@ -683,7 +683,7 @@ class Gridder:
         else:
             layout = None
 
-        cls = cls(
+        instance = cls(
             u_meter=u_meter.cpu().numpy(),
             v_meter=v_meter.cpu().numpy(),
             times=times,
@@ -723,9 +723,9 @@ class Gridder:
             # FIXME: probably some kind of difference in normalization.
             # Factor 2 fixes this for now. Has to be investigated.
             stokes_vis *= 2
-            cls.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
+            instance.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
 
-        return cls
+        return instance
 
     @classmethod
     def from_uvh5(
@@ -857,7 +857,7 @@ class Gridder:
             ra = np.float64(hf["obs"]["ra"])
             dec = np.float64(hf["obs"]["dec"])
 
-        cls = cls(
+        instance = cls(
             u_meter=u_meter,
             v_meter=v_meter,
             times=times,
@@ -893,9 +893,9 @@ class Gridder:
             except AxisError:
                 stokes_vis = stokes_vis.ravel()
 
-            cls.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
+            instance.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
 
-        return cls
+        return instance
 
     @classmethod
     def from_fits(
@@ -903,7 +903,7 @@ class Gridder:
         path: str,
         img_size: int,
         fov: float,
-        uv_colnames: dict = None,
+        uv_colnames: dict | None = None,
     ) -> GridData:
         """Initializes the gridder with the visibility data in a
         given FITS file using the default Gridder for the radionets-project.
@@ -961,7 +961,7 @@ class Gridder:
             + (vis[..., 1, 0] + 1j * vis[..., 1, 1])
         ).ravel()[:, None]
 
-        cls = cls(
+        instance = cls(
             u_meter=u_meter,
             v_meter=v_meter,
             times=times,
@@ -976,9 +976,9 @@ class Gridder:
             else None,
         )
 
-        cls.stokes["I"] = GridData(vis_data=stokes_i)
+        instance.stokes["I"] = GridData(vis_data=stokes_i)
 
-        return cls
+        return instance
 
     @classmethod
     def from_ms(
@@ -1083,7 +1083,7 @@ class Gridder:
 
         src_ra, src_dec = np.rad2deg(source_table.getcol("DIRECTION")[0])
 
-        cls = cls(
+        instance = cls(
             u_meter=u_meter,
             v_meter=v_meter,
             times=Time(times / 3600 / 24, format="mjd").mjd,
@@ -1098,9 +1098,9 @@ class Gridder:
             else None,
         )
 
-        cls.stokes["I"] = GridData(vis_data=stokes_i.ravel())
+        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel())
 
-        return cls
+        return instance
 
     def plot_ungridded_uv(
         self, **kwargs
