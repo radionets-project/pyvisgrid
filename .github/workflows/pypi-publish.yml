@@ -1,4 +1,4 @@
-name: Build Python Package
+name: Build and Publish pyvisgrid
 
 on:
   push:
