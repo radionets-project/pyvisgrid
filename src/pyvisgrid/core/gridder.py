@@ -68,6 +68,7 @@ class GridData:
     mask: np.ndarray | None = None
     mask_real: np.ndarray | None = None
     mask_imag: np.ndarray | None = None
+    dirty_beam: np.ndarray | None = None
     dirty_image: np.ndarray | None = None
 
     def __str__(self) -> str:
@@ -80,6 +81,7 @@ class GridData:
             mask=self.mask,
             mask_real=self.mask_real,
             mask_imag=self.mask_imag,
+            dirty_beam=self.dirty_beam,
             dirty_image=self.dirty_image,
         )
 
@@ -475,6 +477,9 @@ class Gridder:
         grid_data.mask = mask
         grid_data.mask_real = mask_real
         grid_data.mask_imag = mask_imag
+        beam_mask = np.zeros_like(grid_data.mask_real, dtype=np.complex128)
+        beam_mask[grid_data.mask > 1] = 1.0 + 0.0j
+        grid_data.dirty_beam = np.fft.fftshift(np.fft.ifft2(np.fft.fftshift(beam_mask)))
         grid_data.dirty_image = np.fft.fftshift(
             np.fft.ifft2(np.fft.fftshift(mask_real + 1j * mask_imag))
         )
@@ -1289,10 +1294,129 @@ class Gridder:
 
         return plotting.plot_mask(self[stokes_component], **kwargs)
 
+    def plot_dirty_beam(
+        self, stokes_component: str = "I", **kwargs
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+        """Plots the dirty beam, meaning the image space response of the
+        given (u,v) coverage to a point source.
+
+        Parameters
+        ----------
+        stokes_component : str, optional
+            The symbol of the stokes component whose dirty image should be plotted.
+            The specified component has to be initialized and gridded first!
+            Otherwise this will result in a ``KeyError``.
+            Default is ``'I'``.
+
+        mode : str, optional
+            The mode specifying which values of the dirty image should be plotted.
+            Possible values are:
+
+            - ``real``:     Plots the real part of the dirty image.
+
+            - ``imag``:     Plots the imaginary part of the dirty image.
+
+            - ``abs``:      Plot the absolute value of the dirty image.
+
+            Default is ``real``.
+
+        ax_unit: str | astropy.units.Unit, optional
+            The unit in which to show the ticks of the x and y-axes in.
+            The y-axis is the Declination (DEC) and the x-axis is the
+            Right Ascension (RA).
+            The latter one is defined as increasing from left to right!
+            The unit has to be given as a string or an ``astropy.units.Unit``.
+            The string must correspond to the string representation of an
+            ``astropy.units.Unit``.
+
+            Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
+            etc. Default is ``pixel``.
+
+        center_pos: tuple | None, optional
+            The coordinate center of the image. The coordinates have to
+            be given in the unit defined in the parameter ``ax_unit`` above.
+            If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
+            Default is ``None``, meaning the coordinates of the axes will be
+            given as relative.
+
+        norm : str | matplotlib.colors.Normalize | None, optional
+            The name of the norm or a matplotlib norm.
+            Possible values are:
+
+            - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
+                                values above the maximum will be mapped to the maximum
+                                and values below the minimum will be mapped to the
+                                minimum, thus avoiding the appearance of a colormaps
+                                'over' and 'under' colors (e.g. in case of negative
+                                values).
+                                Depending on the use case this is desirable but in
+                                case that it is not, one can set the norm to
+                                ``log_noclip`` or provide a custom norm.
+
+            - ``log_noclip``:   Returns a logarithmic norm with clipping off.
+
+            - ``centered``:     Returns a linear norm which centered around zero.
+
+            - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the
+                                square-root of the values.
+
+            - other:            A value not declared above will be returned as is,
+                                meaning that this could be any value which exists in
+                                matplotlib itself.
+
+            Default is ``None``, meaning no norm will be applied.
+
+        colorbar_shrink: float, optional
+            The shrink parameter of the colorbar. This can be needed if the plot is
+            included as a subplot to adjust the size of the colorbar.
+            Default is ``1``, meaning original scale.
+
+        cmap: str | matplotlib.colors.Colormap, optional
+            The colormap to be used for the plot.
+            Default is ``'inferno'``.
+
+        plot_args : dict | None, optional
+            The additional arguments passed to the scatter plot.
+            Default is ``None``.
+
+        fig_args : dict | None, optional
+            The additional arguments passed to the figure.
+            If a figure object is given in the ``fig`` parameter, this
+            value will be discarded.
+            Default is ``None``.
+
+        save_to : str | PathLike | None, optional
+            The name of the file to save the plot to.
+            Default is ``None``, meaning the plot won't be saved.
+
+        save_args : dict | None, optional
+            The additional arguments passed to the ``fig.savefig`` call.
+            Default is ``{"bbox_inches":"tight"}``.
+
+        fig : matplotlib.figure.Figure | None, optional
+            A custom figure object.
+            If set to ``None``, the ``ax`` parameter also has to be ``None``!
+            Default is ``None``.
+
+        ax : matplotlib.axes.Axes | None, optional
+            A custom axes object.
+            If set to ``None``, the ``fig`` parameter also has to be ``None``!
+            Default is ``None``.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object.
+
+        ax : matplotlib.axes.Axes
+            The axes object.
+        """
+        return plotting.plot_dirty_beam(self[stokes_component], **kwargs)
+
     def plot_dirty_image(
         self, stokes_component: str = "I", **kwargs
     ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
-        """Plots the (u,v) dirty image, meaning the 2d Fourier transform of the
+        """Plots the dirty image, meaning the 2d Fourier transform of the
         gridded visibilities.
 
         Parameters
