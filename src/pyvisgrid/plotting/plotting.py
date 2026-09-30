@@ -744,11 +744,11 @@ def plot_dirty_beam(
 
     match mode:
         case "real":
-            dirty_image = grid_data.dirty_beam.real
+            dirty_beam = grid_data.dirty_beam.real
         case "imag":
-            dirty_image = grid_data.dirty_beam.imag
+            dirty_beam = grid_data.dirty_beam.imag
         case "abs" | "amp":
-            dirty_image = np.abs(grid_data.dirty_beam)
+            dirty_beam = np.abs(grid_data.dirty_beam)
         case _:
             raise ValueError(
                 "The given mode does not exist! Valid modes are: real, imag, abs, amp"
@@ -757,7 +757,7 @@ def plot_dirty_beam(
     unit = units.Unit(ax_unit)
 
     if unit.physical_type == "angle":
-        img_size = dirty_image.shape[0]
+        img_size = dirty_beam.shape[0]
         cell_size = grid_data.fov / img_size
 
         extent = (
@@ -790,7 +790,7 @@ def plot_dirty_beam(
         ax.set_ylabel("Pixels")
 
     im = ax.imshow(
-        dirty_image,
+        dirty_beam,
         norm=norm,
         origin="lower",
         interpolation="none",
