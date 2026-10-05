@@ -799,7 +799,7 @@ def plot_dirty_beam(
         **plot_args,
     )
 
-    _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Flux Density / Jy/pix")
+    _configure_colorbar(mappable=im, ax=ax, fig=fig, label="Intensity / a.u.")
 
     if save_to is not None:
         fig.savefig(save_to, **save_args)

@@ -938,7 +938,7 @@ def plot_observation_state(
                 mappable=psf_im,
                 ax=ax["psf"],
                 fig=fig,
-                label=f"Flux density{mode_str} / Jy/pix"
+                label=f"Intensity {mode_str} / a.u."
                 if axes_options["psf"]["cbar_label"]
                 else None,
                 show_ticks=axes_options["psf"]["cbar_ticks"],
