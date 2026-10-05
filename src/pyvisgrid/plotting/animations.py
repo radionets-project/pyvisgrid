@@ -373,6 +373,8 @@ def plot_observation_state(
     plot_positions: list[list[str]] | None = None,
     dirty_image_mode: str = "real",
     dirty_image_crop: tuple[list[float | None]] = ([None, None], [None, None]),
+    psf_mode: str = "real",
+    psf_crop: tuple[list[float | None]] = ([None, None], [None, None]),
     mask_mode: str = "amp_phase",
     swap_masks: bool = False,
     mask_crop: tuple[list[float | None]] = ([None, None], [None, None]),
@@ -419,6 +421,9 @@ def plot_observation_state(
 
         - ``di``:       Refers to the dirty image plot.
 
+        - ``psf``:      Refers to the synthesized (dirty) beam /
+                        point spread function plot.
+
         - ``earth``:    Refers to the plot of the source position and the
                         antennas on the earth's surface.
 
@@ -449,6 +454,25 @@ def plot_observation_state(
 
     dirty_image_crop : tuple[list[float | None]], optional
         The crop of the dirty image. This has to have the format
+        ``([x_left, x_right], [y_left, y_right])``, where the left and right
+        values for each axis are the upper and lower limits of the axes which
+        should be shown.
+        Default is `([None, None], [None, None])`
+
+    psf_mode : str, optional
+        The mode specifying which values of the dirty beam (PSF) should be plotted.
+        Possible values are:
+
+        - ``real``:     Plots the real part of the dirty beam.
+
+        - ``imag``:     Plots the imaginary part of the dirty beam.
+
+        - ``abs`` / ``amp``:      Plot the absolute value of the dirty beam.
+
+        Default is ``real``.
+
+    psf_crop : tuple[list[float | None]], optional
+        The crop of the dirty beam image. This has to have the format
         ``([x_left, x_right], [y_left, y_right])``, where the left and right
         values for each axis are the upper and lower limits of the axes which
         should be shown.
@@ -515,7 +539,22 @@ def plot_observation_state(
                     "cbar_ticks": False,
                     "cbar_label": True,
                     "cbar_fontsize": "small",
-                    "mode_in_label": True,
+                    "mode_in_label": False,
+                },
+                "psf": {
+                    "show_title": True,
+                    "title": "Dirty Beam",
+                    "title_fontsize": "medium",
+                    "axes_ticks": False,
+                    "axes_labels": False,
+                    "axes_fontsize": "x-small",
+                    "cmap": "inferno",
+                    "norm": "sqrt",
+                    "show_cbar": True,
+                    "cbar_ticks": False,
+                    "cbar_label": True,
+                    "cbar_fontsize": "small",
+                    "mode_in_label": False,
                 },
                 "mask_hi": {
                     "show_title": True,
@@ -626,7 +665,22 @@ def plot_observation_state(
             "cbar_ticks": False,
             "cbar_label": True,
             "cbar_fontsize": "small",
-            "mode_in_label": True,
+            "mode_in_label": False,
+        },
+        "psf": {
+            "show_title": True,
+            "title": "Dirty Beam",
+            "title_fontsize": "medium",
+            "axes_ticks": False,
+            "axes_labels": False,
+            "axes_fontsize": "x-small",
+            "cmap": "inferno",
+            "norm": "sqrt",
+            "show_cbar": True,
+            "cbar_ticks": False,
+            "cbar_label": True,
+            "cbar_fontsize": "small",
+            "mode_in_label": False,
         },
         "mask_hi": {
             "show_title": True,
@@ -782,10 +836,13 @@ def plot_observation_state(
         match dirty_image_mode:
             case "real":
                 dirty_image = vis_data.dirty_image.real
+                dirty_image_max = vis_data_max.dirty_image.real
             case "imag":
                 dirty_image = vis_data.dirty_image.imag
+                dirty_image_max = vis_data_max.dirty_image.imag
             case "abs" | "amp":
                 dirty_image = np.abs(vis_data.dirty_image)
+                dirty_image_max = np.abs(vis_data_max.dirty_image)
             case _:
                 raise ValueError(
                     "The given dirty image mode does not exist! "
@@ -797,10 +854,8 @@ def plot_observation_state(
             cmap=axes_options["di"]["cmap"],
             norm=_get_norm(
                 axes_options["di"]["norm"],
-                vmin=vis_data_max.dirty_image.real[
-                    vis_data_max.dirty_image.real > 0
-                ].min(),
-                vmax=vis_data_max.dirty_image.real.max(),
+                vmin=dirty_image_max[dirty_image_max > 0].min(),
+                vmax=dirty_image_max.max(),
             ),
             origin="lower",
             interpolation="none",
@@ -808,7 +863,9 @@ def plot_observation_state(
 
         if axes_options["di"]["show_cbar"]:
             mode_str = (
-                "" if axes_options["di"]["mode_in_label"] else f" {dirty_image_mode}"
+                ""
+                if not axes_options["di"]["mode_in_label"]
+                else f" {dirty_image_mode}"
             )
             _configure_colorbar(
                 mappable=di_im,
@@ -843,6 +900,77 @@ def plot_observation_state(
 
     else:
         di_im = None
+
+    if _is_value_in("psf", plot_positions):
+        match psf_mode:
+            case "real":
+                psf = vis_data.dirty_beam.real
+                psf_max = vis_data_max.dirty_beam.real
+            case "imag":
+                psf = vis_data.dirty_beam.imag
+                psf_max = vis_data_max.dirty_beam.imag
+            case "abs" | "amp":
+                psf = np.abs(vis_data.dirty_beam)
+                psf_max = np.abs(vis_data_max.dirty_beam)
+            case _:
+                raise ValueError(
+                    "The given dirty beam mode does not exist! "
+                    "Valid modes are: real, imag, abs / amp"
+                )
+
+        psf_im = ax["psf"].imshow(
+            X=psf,
+            cmap=axes_options["psf"]["cmap"],
+            norm=_get_norm(
+                axes_options["psf"]["norm"],
+                vmin=psf_max[psf_max > 0].min(),
+                vmax=psf_max.max(),
+            ),
+            origin="lower",
+            interpolation="none",
+        )
+
+        if axes_options["psf"]["show_cbar"]:
+            mode_str = (
+                "" if not axes_options["psf"]["mode_in_label"] else f" {psf_mode}"
+            )
+            _configure_colorbar(
+                mappable=psf_im,
+                ax=ax["psf"],
+                fig=fig,
+                label=f"Intensity {mode_str} / a.u."
+                if axes_options["psf"]["cbar_label"]
+                else None,
+                show_ticks=axes_options["psf"]["cbar_ticks"],
+                fontsize=axes_options["psf"]["cbar_fontsize"],
+            )
+
+        if axes_options["psf"]["show_title"]:
+            ax["psf"].set_title(
+                "Dirty Beam", fontsize=axes_options["di"]["title_fontsize"]
+            )
+        if axes_options["psf"]["axes_labels"]:
+            ax["psf"].set_xlabel(
+                "Pixels", fontsize=axes_options["psf"]["axes_fontsize"]
+            )
+            ax["psf"].set_ylabel(
+                "Pixels", fontsize=axes_options["psf"]["axes_fontsize"]
+            )
+        if not axes_options["psf"]["axes_ticks"]:
+            ax["psf"].set_xticks([])
+            ax["psf"].set_yticks([])
+        else:
+            ax["psf"].xaxis.set_tick_params(
+                labelsize=axes_options["psf"]["axes_fontsize"]
+            )
+            ax["psf"].yaxis.set_tick_params(
+                labelsize=axes_options["psf"]["axes_fontsize"]
+            )
+
+        _apply_crop(ax=ax["psf"], crop=psf_crop)
+
+    else:
+        psf_im = None
 
     if _is_value_in("earth", plot_positions):
         plot_earth_layout(
@@ -924,6 +1052,7 @@ def plot_observation_state(
     plots = {
         "uv": uv_scat,
         "di": di_im,
+        "psf": psf_im,
         "earth": _is_value_in("earth", plot_positions),
         "mask_hi": None,
         "mask_lo": None,
@@ -1092,6 +1221,21 @@ def animate_observation(
                     "cbar_label": True,
                     "cbar_fontsize": "small",
                     "mode_in_label": True,
+                },
+                "psf": {
+                    "show_title": True,
+                    "title": "Dirty Beam",
+                    "title_fontsize": "medium",
+                    "axes_ticks": False,
+                    "axes_labels": False,
+                    "axes_fontsize": "x-small",
+                    "cmap": "inferno",
+                    "norm": "sqrt",
+                    "show_cbar": True,
+                    "cbar_ticks": False,
+                    "cbar_label": True,
+                    "cbar_fontsize": "small",
+                    "mode_in_label": False,
                 },
                 "mask_hi": {
                     "show_title": True,
