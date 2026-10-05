@@ -46,11 +46,11 @@ dependencies = [
   "toml>=0.10.2",
   "torch>=2.8.0",
   "tqdm>=4.67.1",
+  "radionets-radiotools>=0.3.0",
 ]
 
 [project.optional-dependencies]
 pyvisgen = ["pyvisgen"]
-animations = ["cartopy", "mergedeep", "radionets-radiotools"]
 
 all = ["pyvisgrid[pyvisgen]"]
 
