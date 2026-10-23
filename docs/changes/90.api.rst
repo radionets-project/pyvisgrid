@@ -1,0 +1,1 @@
+Added the argument ``normalized`` to ``Gridder.from_pyvisgen`` to scale visibilities that were simulated with ``normalize=True`` in ``pyvisgen`` back to the standard convention, in which an unpolarised source has ``V_11 = V_22 = I``.
