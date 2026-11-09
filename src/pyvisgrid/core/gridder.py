@@ -30,14 +30,9 @@ except ImportError:
 
 
 from pyvisgrid import plotting
-<<<<<<< HEAD
-from pyvisgrid.core.stokes import get_stokes_from_vis_data
-from pyvisgrid.core.weights import read_ms_weights, combine_weights
-||||||| b24e49e
-from pyvisgrid.core.stokes import get_stokes_from_vis_data
-=======
+
 from pyvisgrid.core.stokes import get_ms_data_idx, get_stokes_from_vis_data
->>>>>>> refs/remotes/origin/add_dirty_beam
+from pyvisgrid.core.weights import combine_weights, read_ms_weights
 
 __all__ = ["GridData", "GridDataSeries", "Gridder"]
 
