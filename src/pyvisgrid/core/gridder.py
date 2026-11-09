@@ -31,6 +31,7 @@ except ImportError:
 
 from pyvisgrid import plotting
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
+from pyvisgrid.core.weights import read_ms_weights, combine_weights
 
 __all__ = ["GridData", "GridDataSeries", "Gridder"]
 
@@ -58,6 +59,12 @@ class GridData:
     mask_imag : numpy.ndarray, optional
         The gridded imaginary part of the visibilities.
 
+    weights: np.ndarray, optional
+        Noise weights (1/sigma^2), None -> ones
+
+    weights_grid: np.ndarray, optional
+        Summed weights per grid cell
+
     dirty_img : numpy.ndarray, optional
         The complex Dirty Image. This is the 2-dimensional Fourier transform
         of the gridded visibilities.
@@ -68,6 +75,8 @@ class GridData:
     mask: np.ndarray | None = None
     mask_real: np.ndarray | None = None
     mask_imag: np.ndarray | None = None
+    weights: np.ndarray | None = None
+    weight_grid: np.ndarray | None = None
     dirty_beam: np.ndarray | None = None
     dirty_image: np.ndarray | None = None
 
@@ -81,6 +90,8 @@ class GridData:
             mask=self.mask,
             mask_real=self.mask_real,
             mask_imag=self.mask_imag,
+            weights=self.weights,
+            weight_grid=self.weight_grid,
             dirty_beam=self.dirty_beam,
             dirty_image=self.dirty_image,
         )
@@ -757,8 +768,11 @@ class Gridder:
         uv = main_tab.getcol("UVW")[:, :2]
         times = main_tab.getcol("TIME")
 
+        weights = read_ms_weights(main_tab, data.shape)
+
         if filter_flagged:
             flag_mask = main_tab.getcol("FLAG")
+            weights[flag_mask] = 0.0
             flag_mask = flag_mask.reshape((flag_mask.shape[0], -1)).astype(np.uint8)
             flag_mask = np.prod(flag_mask, axis=1)
 
@@ -769,6 +783,7 @@ class Gridder:
 
         uv = uv[flag_mask]
         data = data[flag_mask]
+        weights = weights[flag_mask]
         times = times[flag_mask]
 
         u_meter = uv[:, 0]
@@ -776,6 +791,9 @@ class Gridder:
 
         stokes_i = data[..., 0] + data[..., 1]
         stokes_i = stokes_i.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
+        
+        weights_i = combine_weights(weights[..., data_idx[0]], weights[..., data_idx[1]])
+        weights_i = weights_i.T
 
         # FIXME: probably some kind of difference in normalization.
         # Factor 0.5 fixes this for now. Has to be investigated.
@@ -798,7 +816,7 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel())
+        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel(), weights=weights_i.ravel())
 
         return instance
 
