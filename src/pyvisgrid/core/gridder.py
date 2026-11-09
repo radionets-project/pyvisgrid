@@ -30,7 +30,6 @@ except ImportError:
 
 
 from pyvisgrid import plotting
-
 from pyvisgrid.core.stokes import get_ms_data_idx, get_stokes_from_vis_data
 from pyvisgrid.core.weights import combine_weights, read_ms_weights
 
@@ -831,7 +830,9 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(vis_data=stokes.ravel(), weights=weights.ravel())
+        instance.stokes["I"] = GridData(
+            vis_data=stokes.ravel(), weights=weights.ravel()
+        )
 
         return instance
 
