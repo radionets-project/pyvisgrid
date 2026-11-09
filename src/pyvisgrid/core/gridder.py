@@ -44,10 +44,11 @@ class GridData:
     Attributes
     ----------
     vis_data : numpy.ndarray
-        The ungridded visibilities of shape ``(N_MEASUREMENTS * N_CHANNELS,)``.
+        The ungridded visibilities of shape ``(N_CHANNELS * N_MEASUREMENTS,)``
+        (frequency-major, i.e. all measurements of the first channel first).
 
-    fov : float
-        The size of the Field Of View of the gridded data in arcseconds.
+    fov : float, optional
+        The size of the Field Of View of the gridded data in radians.
 
     mask : numpy.ndarray, optional
         The mask created from the given (u,v) coordinates. The mask contains
@@ -59,13 +60,22 @@ class GridData:
     mask_imag : numpy.ndarray, optional
         The gridded imaginary part of the visibilities.
 
-    weights: np.ndarray, optional
-        Noise weights (1/sigma^2), None -> ones
+    weights : numpy.ndarray, optional
+        The noise weights (1 / sigma^2) of the ungridded visibilities. Same
+        number of samples and same ordering as ``vis_data``. Flagged samples
+        have weight 0. ``None`` means unit weights.
 
-    weights_grid: np.ndarray, optional
-        Summed weights per grid cell
+    weight_grid : numpy.ndarray, optional
+        The summed noise weights per grid cell, ``W_k = sum_i w_i``.
 
-    dirty_img : numpy.ndarray, optional
+    weight_sum : float, optional
+        The sum of the imaging (cell) weights. This is the peak of the
+        unnormalized dirty beam and the normalization of the dirty image.
+
+    dirty_beam : numpy.ndarray, optional
+        The complex Dirty Beam (point spread function).
+
+    dirty_image : numpy.ndarray, optional
         The complex Dirty Image. This is the 2-dimensional Fourier transform
         of the gridded visibilities.
     """
@@ -77,11 +87,43 @@ class GridData:
     mask_imag: np.ndarray | None = None
     weights: np.ndarray | None = None
     weight_grid: np.ndarray | None = None
+    weight_sum: float | None = None
     dirty_beam: np.ndarray | None = None
     dirty_image: np.ndarray | None = None
 
+    def __post_init__(self) -> None:
+        if self.weights is None:
+            return
+
+        self.weights = np.asarray(self.weights, dtype=np.float64)
+
+        if self.weights.size != np.size(self.vis_data):
+            raise ValueError(
+                f"The number of weights ({self.weights.size}) has to match the "
+                f"number of visibilities ({np.size(self.vis_data)})!"
+            )
+
+        if np.any(self.weights < 0):
+            raise ValueError(
+                "The weights have to be non-negative. Use 0 for flagged data!"
+            )
+
     def __str__(self) -> str:
         return self.__dict__
+
+    def get_weights(self) -> np.ndarray:
+        """Returns the noise weights as a flat array. If no weights
+        were given, unit weights are returned.
+
+        Returns
+        -------
+        numpy.ndarray
+            The noise weights of shape ``(N_CHANNELS * N_MEASUREMENTS,)``.
+        """
+        if self.weights is None:
+            return np.ones(np.size(self.vis_data), dtype=np.float64)
+
+        return self.weights.ravel()
 
     def copy(self) -> GridData:
         return GridData(
@@ -92,6 +134,7 @@ class GridData:
             mask_imag=self.mask_imag,
             weights=self.weights,
             weight_grid=self.weight_grid,
+            weight_sum=self.weight_sum,
             dirty_beam=self.dirty_beam,
             dirty_image=self.dirty_image,
         )
@@ -281,6 +324,10 @@ class GridDataSeries:
 
         grid_data = self._grid_data_full.copy()
         grid_data.vis_data = grid_data.vis_data[time_idcs]
+
+        if grid_data.weights is not None:
+            grid_data.weights = grid_data.weights[time_idcs]
+
         return grid_data
 
     def add_grid_data(self, grid_data: GridData) -> None:
