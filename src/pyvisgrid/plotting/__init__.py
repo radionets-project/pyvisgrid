@@ -3,10 +3,16 @@ from pyvisgrid.plotting.animations import (
     plot_earth_layout,
     plot_observation_state,
 )
-from pyvisgrid.plotting.plotting import plot_dirty_image, plot_mask, plot_ungridded_uv
+from pyvisgrid.plotting.plotting import (
+    plot_dirty_beam,
+    plot_dirty_image,
+    plot_mask,
+    plot_ungridded_uv,
+)
 
 __all__ = [
     "animate_observation",
+    "plot_dirty_beam",
     "plot_dirty_image",
     "plot_earth_layout",
     "plot_mask",

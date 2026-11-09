@@ -1,13 +1,74 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 if TYPE_CHECKING:
     from pyvisgen.simulation import Visibilities
 
-__all__ = ["compute_single_stokes_component", "get_stokes_from_vis_data"]
+__all__ = [
+    "compute_single_stokes_component",
+    "get_ms_data_idx",
+    "get_stokes_from_vis_data",
+]
+
+STOKES_PARAMETER_FORMULAS = {
+    "I": {
+        "linear": "XX+YY",
+        "circular": "RR+LL",
+    },
+    "V": {
+        "linear": "i(YX-XY)",
+        "circular": "RR-LL",
+    },
+    "Q": {
+        "linear": "XX-YY",
+        "circular": "RL-LR",
+    },
+    "U": {
+        "linear": "XY+YX",
+        "circular": "i(LR-RL)",
+    },
+}
+
+# From http://github.com/casacore/casacore/blob/master/measures/Measures/Stokes.h
+CORR_TYPES = [
+    "Undefined",
+    # standard stokes parameters
+    "I",
+    "Q",
+    "U",
+    "V",
+    # circular correlation products
+    "RR",
+    "RL",
+    "LR",
+    "LL",
+    # linear correlation products
+    "XX",
+    "XY",
+    "YX",
+    "YY",
+    # mixed correlation products
+    "RX",
+    "RY",
+    "LX",
+    "LY",
+    "XR",
+    "XL",
+    "YR",
+    "YL",
+    # general quasi-orthogonal correlation products
+    "PP",
+    "PQ",
+    "QP",
+    "QQ",
+]
+
+CORR_TYPES = dict(zip(CORR_TYPES, np.arange(len(CORR_TYPES)).tolist()))
 
 
 def get_stokes_from_vis_data(
@@ -119,3 +180,65 @@ def compute_single_stokes_component(
             imag = vis_data[..., stokes_comp_1, 1] - vis_data[..., stokes_comp_2, 1]
 
     return real + 1j * imag
+
+
+def get_ms_data_idx(stokes_comp: str, corr_types: ArrayLike) -> dict:
+
+    @dataclass
+    class Correlation:
+        name: str
+
+        def get_corr_idx(self) -> int:
+            return CORR_TYPES[self.name]
+
+        def is_in_types(self) -> bool:
+            return self.get_corr_idx() in corr_types
+
+        def get_data_idx(self) -> int:
+            return int(np.argwhere(corr_types == self.get_corr_idx()).ravel()[0])
+
+    def _decode_stokes_formula(formula: str):
+        imaginary = formula.startswith("i")
+        signum = -1 if "-" in formula else 1
+        correlations = (
+            formula.replace("i", "")
+            .replace("(", "")
+            .replace(")", "")
+            .split("-" if signum == -1 else "+")
+        )
+        return {
+            "imaginary": imaginary,
+            "signum": signum,
+            "correlations": [Correlation(name) for name in correlations],
+        }
+
+    output = {
+        "imaginary": False,
+        "signum": 1,
+        "data_idx": [None, None],
+    }
+
+    for mode in ["circular", "linear"]:
+        calc_params = _decode_stokes_formula(
+            STOKES_PARAMETER_FORMULAS[stokes_comp][mode]
+        )
+        valid = [
+            correlation.is_in_types() for correlation in calc_params["correlations"]
+        ]
+
+        if not np.all(valid):
+            continue
+
+        output["imaginary"] = calc_params["imaginary"]
+        output["signum"] = calc_params["signum"]
+        output["data_idx"] = [
+            correlation.get_data_idx() for correlation in calc_params["correlations"]
+        ]
+
+    if output["data_idx"] == [None, None]:
+        raise IndexError(
+            "The Measurement Set does not contain valid correlations to "
+            f"calculate Stokes {stokes_comp}."
+        )
+
+    return output

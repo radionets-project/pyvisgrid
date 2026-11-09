@@ -1,0 +1,2 @@
+- Add dirty beam to ``GridData`` class
+- Add plot of the dirty beam (PSF) to plotting and animation
