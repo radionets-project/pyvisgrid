@@ -719,6 +719,11 @@ class Gridder:
             + (vis[..., 1, 0] + 1j * vis[..., 1, 1])
         ).ravel()[:, None]
 
+        # UVFITS stores the weight of each correlation in the last entry of
+        # the COMPLEX axis. Negative weights mark flagged data.
+        corr_weights = np.clip(vis[..., :2, 2], a_min=0.0, a_max=None)
+        weights = combine_weights(corr_weights[..., 0], corr_weights[..., 1]).ravel()
+
         instance = cls(
             u_meter=u_meter,
             v_meter=v_meter,
@@ -734,7 +739,7 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(vis_data=stokes_i)
+        instance.stokes["I"] = GridData(vis_data=stokes_i, weights=weights)
 
         return instance
 
