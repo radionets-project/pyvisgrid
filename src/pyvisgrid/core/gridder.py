@@ -1143,10 +1143,24 @@ class Gridder:
                 axes=(1, 2, 0),
             )
 
+            # natural weights (1/sigma^2) of shape (N_MEASUREMENTS, N_CHANNELS),
+            # the same for every correlation. Older files do not contain weights.
+            if "weights" in vis:
+                vis_weights = np.asarray(vis["weights"], dtype=np.float64)[avail]
+            else:
+                vis_weights = None
+
             if vis_data.ndim != 7:
                 if vis_data.ndim == 3:
+                    if vis_weights is None:
+                        corr_weights = np.ones(vis_data.shape)
+                    else:
+                        corr_weights = np.broadcast_to(
+                            vis_weights[..., None], vis_data.shape
+                        )
+
                     vis_data = np.stack(
-                        [vis_data.real, vis_data.imag, np.ones(vis_data.shape)],
+                        [vis_data.real, vis_data.imag, corr_weights],
                         axis=3,
                     )[:, None, None, :, None, ...]
                 else:
@@ -1209,12 +1223,19 @@ class Gridder:
             # get stokes visibilities depending on stokes component to grid
             # and polarization mode
             stokes_vis = get_stokes_from_vis_data(vis_data, stokes_comp, polarization)
+            stokes_weights = get_stokes_weights_from_vis_data(
+                vis_data, stokes_comp, polarization
+            )
             try:
                 stokes_vis = stokes_vis.swapaxes(0, 1).ravel()
+                stokes_weights = stokes_weights.swapaxes(0, 1).ravel()
             except AxisError:
                 stokes_vis = stokes_vis.ravel()
+                stokes_weights = stokes_weights.ravel()
 
-            instance.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
+            instance.stokes[stokes_comp] = GridData(
+                vis_data=stokes_vis, weights=stokes_weights
+            )
 
         return instance
 
