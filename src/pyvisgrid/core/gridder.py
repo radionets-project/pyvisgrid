@@ -30,8 +30,14 @@ except ImportError:
 
 
 from pyvisgrid import plotting
+<<<<<<< HEAD
 from pyvisgrid.core.stokes import get_stokes_from_vis_data
 from pyvisgrid.core.weights import read_ms_weights, combine_weights
+||||||| b24e49e
+from pyvisgrid.core.stokes import get_stokes_from_vis_data
+=======
+from pyvisgrid.core.stokes import get_ms_data_idx, get_stokes_from_vis_data
+>>>>>>> refs/remotes/origin/add_dirty_beam
 
 __all__ = ["GridData", "GridDataSeries", "Gridder"]
 
@@ -639,7 +645,7 @@ class Gridder:
             'UU' and 'VV' or 'UU--' and 'VV--' will be used.
         """
         if uv_colnames is None:
-            uv_colnames = dict(u=None, v=None)
+            uv_colnames = {"u": None, "v": None}
 
         path = Path(path)
         file = fits.open(path)
@@ -698,6 +704,7 @@ class Gridder:
         img_size: int,
         fov: float,
         desc_id: int,
+        stokes_component: str = "I",
         ref_frequency_id: int = 0,
         use_calibrated: bool = False,
         filter_flagged: bool = True,
@@ -748,6 +755,8 @@ class Gridder:
         source_table = table(str(path / "SOURCE"), ack=False)
         data_desc_table = table(str(path / "DATA_DESCRIPTION"), ack=False)
 
+        pol_tab = table(str(path / "POLARIZATION"), ack=False)
+
         spw_id = data_desc_table.getcell("SPECTRAL_WINDOW_ID", desc_id)
 
         data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
@@ -788,16 +797,27 @@ class Gridder:
 
         u_meter = uv[:, 0]
         v_meter = uv[:, 1]
-
-        stokes_i = data[..., 0] + data[..., 1]
-        stokes_i = stokes_i.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
         
-        weights_i = combine_weights(weights[..., data_idx[0]], weights[..., data_idx[1]])
-        weights_i = weights_i.T
+        stokes_calc_param = get_ms_data_idx(
+            stokes_comp=stokes_component, corr_types=pol_tab.getcell("CORR_TYPE", 0)
+        )
+        data_idx = stokes_calc_param["data_idx"]
+
+        stokes = (
+            data[..., data_idx[0]]
+            + stokes_calc_param["signum"] * data[..., data_idx[1]]
+        )
+
+        if stokes_calc_param["imaginary"]:
+            stokes = 1j * stokes
+        stokes = stokes.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
+
+        weights = combine_weights(weights[..., data_idx[0]], weights[..., data_idx[1]])
+        weights = weights.T
 
         # FIXME: probably some kind of difference in normalization.
         # Factor 0.5 fixes this for now. Has to be investigated.
-        stokes_i *= 0.5
+        stokes *= 0.5
 
         src_ra, src_dec = np.rad2deg(source_table.getcol("DIRECTION")[0])
 
@@ -816,7 +836,7 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel(), weights=weights_i.ravel())
+        instance.stokes["I"] = GridData(vis_data=stokes.ravel(), weights=weights.ravel())
 
         return instance
 
