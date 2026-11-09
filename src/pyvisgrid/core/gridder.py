@@ -792,7 +792,7 @@ class Gridder:
 
         u_meter = uv[:, 0]
         v_meter = uv[:, 1]
-        
+
         stokes_calc_param = get_ms_data_idx(
             stokes_comp=stokes_component, corr_types=pol_tab.getcell("CORR_TYPE", 0)
         )

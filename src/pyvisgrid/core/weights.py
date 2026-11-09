@@ -14,6 +14,7 @@ def read_ms_weights(tab, shape: tuple[int, int, int]) -> np.ndarray:
         w = np.divide(1.0, sigma**2, out=np.zeros_like(sigma), where=sigma > 0)
     return np.broadcast_to(w[:, None, :], shape).copy()
 
+
 def combine_weights(w_a: np.ndarray, w_b: np.ndarray) -> np.ndarray:
     """Inverse-variance weight of V_a ± V_b, i.e. 1/w = 1/w_a + 1/w_b.
     Zero if either input is zero (flagged)."""
