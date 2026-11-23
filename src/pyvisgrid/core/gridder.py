@@ -546,22 +546,37 @@ class Gridder:
         mask_imag = mask_imag.T  # see above
         mask_weight = mask_weight.T  # see above
 
-        mask_real /= mask
-        mask_imag /= mask
-        mask_weight /= mask
+        # weighted mean per cell: sum(w * V) / sum(w)
+        occupied = mask_weight > 0
+        mask_real = np.divide(
+            mask_real, mask_weight, out=np.zeros_like(mask_real), where=occupied
+        )
+        mask_imag = np.divide(
+            mask_imag, mask_weight, out=np.zeros_like(mask_imag), where=occupied
+        )
 
-        grid_data.fov = self.fov
-        grid_data.mask = mask
-        grid_data.mask_real = mask_real
-        grid_data.mask_imag = mask_imag
         cell_weights = self._cell_weights(mask_weight, weighting)
         weight_sum = float(cell_weights.sum())
-        grid_data.dirty_beam = np.fft.fftshift(
-            np.fft.ifft2(np.fft.fftshift(cell_weights))
+
+        norm = N**2 / weight_sum  # ifft2 contains 1/N^2 -> normalize by sum(rho)
+
+        grid_data.fov = self.fov
+        grid_data.mask = mask  # can be removed?
+        grid_data.mask_real = mask_real
+        grid_data.mask_imag = mask_imag
+        grid_data.weight_grid = mask_weight
+        grid_data.weight_sum = weight_sum
+        grid_data.dirty_beam = (
+            np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(cell_weights))) * norm
         )
-        grid_data.dirty_image = np.fft.fftshift(
-            np.fft.ifft2(np.fft.fftshift(mask_real + 1j * mask_imag))
-        ) * (N**2 / weight_sum)
+        grid_data.dirty_image = (
+            np.fft.fftshift(
+                np.fft.ifft2(
+                    np.fft.ifftshift(cell_weights * (mask_real + 1j * mask_imag))
+                )
+            )
+            * norm
+        )
 
         return grid_data
 
