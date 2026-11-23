@@ -56,7 +56,7 @@ class GridData:
         The noise weights (1 / sigma^2) of the ungridded visibilities. Same
         number of samples and same ordering as ``vis_data``. Flagged samples
         have weight 0. ``None`` means unit weights.
-        
+
     fov : float, optional
         The size of the Field Of View of the gridded data in radians.
 
