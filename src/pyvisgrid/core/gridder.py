@@ -51,7 +51,6 @@ class GridData:
     ----------
     vis_data : numpy.ndarray
         The ungridded visibilities of shape ``(N_CHANNELS * N_MEASUREMENTS,)``
-        (frequency-major, i.e. all measurements of the first channel first).
 
     fov : float, optional
         The size of the Field Of View of the gridded data in radians.
@@ -101,12 +100,10 @@ class GridData:
         if self.weights is None:
             return
 
-        self.weights = np.asarray(self.weights, dtype=np.float64)
-
-        if self.weights.size != np.size(self.vis_data):
+        if self.weights.size != self.vis_data.size:
             raise ValueError(
                 f"The number of weights ({self.weights.size}) has to match the "
-                f"number of visibilities ({np.size(self.vis_data)})!"
+                f"number of visibilities ({self.vis_data.size})!"
             )
 
         if np.any(self.weights < 0):
@@ -127,7 +124,7 @@ class GridData:
             The noise weights of shape ``(N_CHANNELS * N_MEASUREMENTS,)``.
         """
         if self.weights is None:
-            return np.ones(np.size(self.vis_data), dtype=np.float64)
+            return np.ones(self.vis_data.size)
 
         return self.weights.ravel()
 
