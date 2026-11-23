@@ -30,9 +30,16 @@ except ImportError:
 
 
 from pyvisgrid import plotting
-from pyvisgrid.core.stokes import get_stokes_from_vis_data
+from pyvisgrid.core.stokes import get_ms_data_idx, get_stokes_from_vis_data
+from pyvisgrid.core.weights import (
+    combine_weights,
+    get_stokes_weights_from_vis_data,
+    read_ms_weights,
+)
 
 __all__ = ["GridData", "GridDataSeries", "Gridder"]
+
+WEIGHTING_SCHEMES = ("uniform", "natural")
 
 
 @dataclass
@@ -43,10 +50,15 @@ class GridData:
     Attributes
     ----------
     vis_data : numpy.ndarray
-        The ungridded visibilities of shape ``(N_MEASUREMENTS * N_CHANNELS,)``.
+        The ungridded visibilities of shape ``(N_CHANNELS * N_MEASUREMENTS,)``
 
-    fov : float
-        The size of the Field Of View of the gridded data in arcseconds.
+    weights : numpy.ndarray
+        The noise weights (1 / sigma^2) of the ungridded visibilities. Same
+        number of samples and same ordering as ``vis_data``. Flagged samples
+        have weight 0. ``None`` means unit weights.
+
+    fov : float, optional
+        The size of the Field Of View of the gridded data in radians.
 
     mask : numpy.ndarray, optional
         The mask created from the given (u,v) coordinates. The mask contains
@@ -58,16 +70,30 @@ class GridData:
     mask_imag : numpy.ndarray, optional
         The gridded imaginary part of the visibilities.
 
-    dirty_img : numpy.ndarray, optional
+    weight_grid : numpy.ndarray, optional
+        The summed noise weights per grid cell, ``W_k = sum_i w_i``.
+
+    weight_sum : float, optional
+        The sum of the imaging (cell) weights. This is the peak of the
+        unnormalized dirty beam and the normalization of the dirty image.
+
+    dirty_beam : numpy.ndarray, optional
+        The complex Dirty Beam (point spread function).
+
+    dirty_image : numpy.ndarray, optional
         The complex Dirty Image. This is the 2-dimensional Fourier transform
         of the gridded visibilities.
     """
 
     vis_data: np.ndarray
+    weights: np.ndarray
     fov: float | None = None
     mask: np.ndarray | None = None
     mask_real: np.ndarray | None = None
     mask_imag: np.ndarray | None = None
+    weight_grid: np.ndarray | None = None
+    weight_sum: float | None = None
+    dirty_beam: np.ndarray | None = None
     dirty_image: np.ndarray | None = None
 
     def __str__(self) -> str:
@@ -80,6 +106,10 @@ class GridData:
             mask=self.mask,
             mask_real=self.mask_real,
             mask_imag=self.mask_imag,
+            weights=self.weights,
+            weight_grid=self.weight_grid,
+            weight_sum=self.weight_sum,
+            dirty_beam=self.dirty_beam,
             dirty_image=self.dirty_image,
         )
 
@@ -268,6 +298,8 @@ class GridDataSeries:
 
         grid_data = self._grid_data_full.copy()
         grid_data.vis_data = grid_data.vis_data[time_idcs]
+        grid_data.weights = grid_data.weights[time_idcs]
+
         return grid_data
 
     def add_grid_data(self, grid_data: GridData) -> None:
@@ -386,8 +418,45 @@ class Gridder:
 
         return self.stokes[i]
 
+    @staticmethod
+    def _cell_weights(mask_weight: np.ndarray, weighting: str) -> np.ndarray:
+        """Imaging weight per grid cell for the given weighting scheme.
+
+        For nearest-neighbour gridding every weighting scheme reduces to a
+        weight ``rho_k`` per cell that multiplies the weighted mean
+        visibility of that cell.
+
+        Parameters
+        ----------
+        weight_grid : numpy.ndarray
+            The summed noise weights per cell, ``W_k = sum_i w_i``.
+
+        weighting : str
+            ``'natural'``: ``rho_k = W_k``.
+            ``'uniform'``: ``rho_k = 1`` for every occupied cell.
+
+        Returns
+        -------
+        numpy.ndarray
+            The imaging weight ``rho_k`` per cell.
+        """
+        match weighting:
+            case "natural":
+                return mask_weight.copy()
+            case "uniform":
+                return (mask_weight > 0).astype(np.float64)
+            case _:
+                raise ValueError(
+                    f"Unknown weighting '{weighting}'. "
+                    f"Supported are: {', '.join(WEIGHTING_SCHEMES)}."
+                )
+
     def _grid(
-        self, grid_data: GridData, u_wave: np.ndarray, v_wave: np.ndarray
+        self,
+        grid_data: GridData,
+        u_wave: np.ndarray,
+        v_wave: np.ndarray,
+        weighting: str = "uniform",
     ) -> GridData:
         """Internal method that grids given visibility data using the default Gridder
         for the radionets-project.
@@ -395,45 +464,45 @@ class Gridder:
         Parameters
         ----------
         grid_data : GridData
-        The ``GridData`` data object containing the visibilities.
+            The ``GridData`` data object containing the visibilities
+            and (optionally) their noise weights.
 
-        u_wave: numpy.ndarray
-        The u coordinates in units of wavelength.
+        u_wave : numpy.ndarray
+            The u coordinates in units of wavelength.
 
-        v_wave: numpy.ndarray
-        The v coordinates in units of wavelength.
+        v_wave : numpy.ndarray
+            The v coordinates in units of wavelength.
 
+        weighting : str, optional
+            The weighting scheme, ``'uniform'`` or ``'natural'``.
+            Default is ``'uniform'``.
 
         Returns
         -------
-        mask : numpy.ndarray, optional
-            The mask created from the given (u,v) coordinates. The mask contains
-            the number of (u,v) coordinates per pixel.
-
-        mask_real : numpy.ndarray, optional
-            The gridded real part of the visibilites.
-
-        mask_imag : numpy.ndarray, optional
-            The gridded imaginary part of the visibilities.
-
-        dirty_img_complex : numpy.ndarray, optional
-            The complex Dirty Image. This is the 2-dimensional Fourier transform
-            of the gridded visibilities.
+        GridData :
+            The GridData object containing gridded visibilities.
         """
+        if weighting not in WEIGHTING_SCHEMES:
+            raise ValueError(
+                f"Unknown weighting '{weighting}'. "
+                f"Supported are: {', '.join(WEIGHTING_SCHEMES)}."
+            )
 
         stokes = grid_data.vis_data
+        weights = grid_data.weights
 
         real = stokes.real.T
         imag = stokes.imag.T
+        weights = weights.T
 
         u_wave_full = np.append(-u_wave.ravel(), u_wave.ravel())
         v_wave_full = np.append(-v_wave.ravel(), v_wave.ravel())
         stokes_real_full = np.append(real.ravel(), real.ravel())
         stokes_imag_full = np.append(-imag.ravel(), imag.ravel())
+        weights_full = np.append(weights.ravel(), weights.ravel())
 
         N = self.img_size
-
-        delta_uv = (self.fov) ** (-1)
+        delta_uv = self.fov ** (-1)
 
         bins = np.arange(
             start=-(N / 2 + 1 / 2) * delta_uv,
@@ -454,34 +523,64 @@ class Gridder:
             x=u_wave_full,
             y=v_wave_full,
             bins=[bins, bins],
-            weights=stokes_real_full,
+            weights=stokes_real_full * weights_full,
             density=False,
         )
         mask_imag, _, _ = np.histogram2d(
             x=u_wave_full,
             y=v_wave_full,
             bins=[bins, bins],
-            weights=stokes_imag_full,
+            weights=stokes_imag_full * weights_full,
+            density=False,
+        )
+
+        mask_weight, _, _ = np.histogram2d(
+            x=u_wave_full,
+            y=v_wave_full,
+            bins=[bins, bins],
+            weights=weights_full,
             density=False,
         )
 
         mask_real = mask_real.T  # see above
         mask_imag = mask_imag.T  # see above
+        mask_weight = mask_weight.T  # see above
 
-        mask_real /= mask
-        mask_imag /= mask
+        # weighted mean per cell: sum(w * V) / sum(w)
+        occupied = mask_weight > 0
+        mask_real = np.divide(
+            mask_real, mask_weight, out=np.zeros_like(mask_real), where=occupied
+        )
+        mask_imag = np.divide(
+            mask_imag, mask_weight, out=np.zeros_like(mask_imag), where=occupied
+        )
+
+        cell_weights = self._cell_weights(mask_weight, weighting)
+        weight_sum = float(cell_weights.sum())
+
+        norm = N**2 / weight_sum  # ifft2 contains 1/N^2 -> normalize by sum(rho)
 
         grid_data.fov = self.fov
-        grid_data.mask = mask
+        grid_data.mask = mask  # can be removed?
         grid_data.mask_real = mask_real
         grid_data.mask_imag = mask_imag
-        grid_data.dirty_image = np.fft.fftshift(
-            np.fft.ifft2(np.fft.fftshift(mask_real + 1j * mask_imag))
+        grid_data.weight_grid = mask_weight
+        grid_data.weight_sum = weight_sum
+        grid_data.dirty_beam = (
+            np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(cell_weights))) * norm
+        )
+        grid_data.dirty_image = (
+            np.fft.fftshift(
+                np.fft.ifft2(
+                    np.fft.ifftshift(cell_weights * (mask_real + 1j * mask_imag))
+                )
+            )
+            * norm
         )
 
         return grid_data
 
-    def grid(self, stokes_component: str = "I") -> GridData:
+    def grid(self, stokes_component: str = "I", weighting: str = "uniform") -> GridData:
         """Grids given visibility data using the default Gridder for the
         radionets-project.
 
@@ -492,6 +591,11 @@ class Gridder:
             The specified component has to be initialized first!
             Otherwise this will result in a ``KeyError``.
             Default is ``'I'``.
+
+        weighting : str, optional
+            The weighting scheme, ``'uniform'`` (every occupied cell has the
+            same weight) or ``'natural'`` (every cell is weighted with the sum
+            of its noise weights). Default is ``'uniform'``.
 
         Returns
         -------
@@ -519,6 +623,7 @@ class Gridder:
             grid_data=self.stokes[stokes_component],
             u_wave=self.u_wave,
             v_wave=self.v_wave,
+            weighting=weighting,
         )
 
     def grid_time_series(
@@ -528,6 +633,7 @@ class Gridder:
         time_end_idx: int | None = None,
         stokes_component: str = "I",
         show_progress: bool = True,
+        weighting: str = "uniform",
     ) -> GridDataSeries:
         """Grids the visibilites in a time series so that time steps get
         gridded individually.
@@ -555,6 +661,10 @@ class Gridder:
         show_progress : bool, optional
             Whether to show a progress bar for the gridding progress.
             Default is ``True``.
+
+        weighting : str, optional
+            The weighting scheme, ``'uniform'`` or ``'natural'``.
+            Default is ``'uniform'``.
 
         Returns
         -------
@@ -587,6 +697,7 @@ class Gridder:
                     grid_data=grid_data_series.get_vis_step(step=idx),
                     u_wave=u_wave,
                     v_wave=v_wave,
+                    weighting=weighting,
                 )
             )
 
@@ -623,7 +734,7 @@ class Gridder:
             'UU' and 'VV' or 'UU--' and 'VV--' will be used.
         """
         if uv_colnames is None:
-            uv_colnames = dict(u=None, v=None)
+            uv_colnames = {"u": None, "v": None}
 
         path = Path(path)
         file = fits.open(path)
@@ -656,6 +767,11 @@ class Gridder:
             + (vis[..., 1, 0] + 1j * vis[..., 1, 1])
         ).ravel()[:, None]
 
+        # UVFITS stores the weight of each correlation in the last entry of
+        # the COMPLEX axis. Negative weights mark flagged data.
+        corr_weights = np.clip(vis[..., :2, 2], a_min=0.0, a_max=None)
+        weights = combine_weights(corr_weights[..., 0], corr_weights[..., 1]).ravel()
+
         instance = cls(
             u_meter=u_meter,
             v_meter=v_meter,
@@ -671,7 +787,7 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(vis_data=stokes_i)
+        instance.stokes["I"] = GridData(vis_data=stokes_i, weights=weights)
 
         return instance
 
@@ -682,6 +798,7 @@ class Gridder:
         img_size: int,
         fov: float,
         desc_id: int,
+        stokes_component: str = "I",
         ref_frequency_id: int = 0,
         use_calibrated: bool = False,
         filter_flagged: bool = True,
@@ -732,6 +849,8 @@ class Gridder:
         source_table = table(str(path / "SOURCE"), ack=False)
         data_desc_table = table(str(path / "DATA_DESCRIPTION"), ack=False)
 
+        pol_tab = table(str(path / "POLARIZATION"), ack=False)
+
         spw_id = data_desc_table.getcell("SPECTRAL_WINDOW_ID", desc_id)
 
         data_colname = "DATA" if not use_calibrated else "MODEL_DATA"
@@ -752,6 +871,8 @@ class Gridder:
         uv = main_tab.getcol("UVW")[:, :2]
         times = main_tab.getcol("TIME")
 
+        weights = read_ms_weights(main_tab, data.shape)
+
         if filter_flagged:
             flag_mask = main_tab.getcol("FLAG")
             flag_mask = flag_mask.reshape((flag_mask.shape[0], -1)).astype(np.uint8)
@@ -764,17 +885,32 @@ class Gridder:
 
         uv = uv[flag_mask]
         data = data[flag_mask]
+        weights = weights[flag_mask]
         times = times[flag_mask]
 
         u_meter = uv[:, 0]
         v_meter = uv[:, 1]
 
-        stokes_i = data[..., 0] + data[..., 1]
-        stokes_i = stokes_i.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
+        stokes_calc_param = get_ms_data_idx(
+            stokes_comp=stokes_component, corr_types=pol_tab.getcell("CORR_TYPE", 0)
+        )
+        data_idx = stokes_calc_param["data_idx"]
+
+        stokes = (
+            data[..., data_idx[0]]
+            + stokes_calc_param["signum"] * data[..., data_idx[1]]
+        )
+
+        if stokes_calc_param["imaginary"]:
+            stokes = 1j * stokes
+        stokes = stokes.T  # ensure matching shape (N_CHANNELS, N_MEASUREMENTS)
+
+        weights = combine_weights(weights[..., data_idx[0]], weights[..., data_idx[1]])
+        weights = weights.T
 
         # FIXME: probably some kind of difference in normalization.
         # Factor 0.5 fixes this for now. Has to be investigated.
-        stokes_i *= 0.5
+        stokes *= 0.5
 
         src_ra, src_dec = np.rad2deg(source_table.getcol("DIRECTION")[0])
 
@@ -793,7 +929,9 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(vis_data=stokes_i.ravel())
+        instance.stokes[stokes_component] = GridData(
+            vis_data=stokes.ravel(), weights=weights.ravel()
+        )
 
         return instance
 
@@ -849,6 +987,12 @@ class Gridder:
             format="jd",
         ).mjd
 
+        # natural weights (1/sigma^2) of shape (N_MEASUREMENTS, N_CHANNELS),
+        # the same for every correlation
+        vis_weights = getattr(vis_data, "weights", None)
+        if isinstance(vis_weights, Tensor):
+            vis_weights = vis_weights.detach().cpu().numpy()
+
         vis_data = vis_data.get_values()
 
         if isinstance(vis_data, Tensor) and vis_data.device.type != "cpu":
@@ -856,8 +1000,16 @@ class Gridder:
 
         if vis_data.ndim != 7:
             if vis_data.ndim == 3:
+                if vis_weights is None:
+                    corr_weights = np.ones(vis_data.shape)
+                else:
+                    corr_weights = np.broadcast_to(
+                        np.asarray(vis_weights, dtype=np.float64)[..., None],
+                        vis_data.shape,
+                    )
+
                 vis_data = np.stack(
-                    [vis_data.real, vis_data.imag, np.ones(vis_data.shape)],
+                    [vis_data.real, vis_data.imag, corr_weights],
                     axis=3,
                 )[:, None, None, :, None, ...]
             else:
@@ -920,15 +1072,22 @@ class Gridder:
             # get stokes visibilities depending on stokes component to grid
             # and polarization mode
             stokes_vis = get_stokes_from_vis_data(vis_data, stokes_comp, polarization)
+            stokes_weights = get_stokes_weights_from_vis_data(
+                vis_data, stokes_comp, polarization
+            )
             try:
                 stokes_vis = stokes_vis.swapaxes(0, 1).ravel()
+                stokes_weights = stokes_weights.swapaxes(0, 1).ravel()
             except AxisError:
                 stokes_vis = stokes_vis.ravel()
+                stokes_weights = stokes_weights.ravel()
 
             # FIXME: probably some kind of difference in normalization.
             # Factor 2 fixes this for now. Has to be investigated.
             stokes_vis *= 2
-            instance.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
+            instance.stokes[stokes_comp] = GridData(
+                vis_data=stokes_vis, weights=stokes_weights
+            )
 
         return instance
 
@@ -1027,10 +1186,24 @@ class Gridder:
                 axes=(1, 2, 0),
             )
 
+            # natural weights (1/sigma^2) of shape (N_MEASUREMENTS, N_CHANNELS),
+            # the same for every correlation. Older files do not contain weights.
+            if "weights" in vis:
+                vis_weights = np.asarray(vis["weights"], dtype=np.float64)[avail]
+            else:
+                vis_weights = None
+
             if vis_data.ndim != 7:
                 if vis_data.ndim == 3:
+                    if vis_weights is None:
+                        corr_weights = np.ones(vis_data.shape)
+                    else:
+                        corr_weights = np.broadcast_to(
+                            vis_weights[..., None], vis_data.shape
+                        )
+
                     vis_data = np.stack(
-                        [vis_data.real, vis_data.imag, np.ones(vis_data.shape)],
+                        [vis_data.real, vis_data.imag, corr_weights],
                         axis=3,
                     )[:, None, None, :, None, ...]
                 else:
@@ -1093,12 +1266,19 @@ class Gridder:
             # get stokes visibilities depending on stokes component to grid
             # and polarization mode
             stokes_vis = get_stokes_from_vis_data(vis_data, stokes_comp, polarization)
+            stokes_weights = get_stokes_weights_from_vis_data(
+                vis_data, stokes_comp, polarization
+            )
             try:
                 stokes_vis = stokes_vis.swapaxes(0, 1).ravel()
+                stokes_weights = stokes_weights.swapaxes(0, 1).ravel()
             except AxisError:
                 stokes_vis = stokes_vis.ravel()
+                stokes_weights = stokes_weights.ravel()
 
-            instance.stokes[stokes_comp] = GridData(vis_data=stokes_vis)
+            instance.stokes[stokes_comp] = GridData(
+                vis_data=stokes_vis, weights=stokes_weights
+            )
 
         return instance
 
@@ -1289,10 +1469,129 @@ class Gridder:
 
         return plotting.plot_mask(self[stokes_component], **kwargs)
 
+    def plot_dirty_beam(
+        self, stokes_component: str = "I", **kwargs
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+        """Plots the dirty beam, meaning the image space response of the
+        given (u,v) coverage to a point source.
+
+        Parameters
+        ----------
+        stokes_component : str, optional
+            The symbol of the stokes component whose dirty image should be plotted.
+            The specified component has to be initialized and gridded first!
+            Otherwise this will result in a ``KeyError``.
+            Default is ``'I'``.
+
+        mode : str, optional
+            The mode specifying which values of the dirty image should be plotted.
+            Possible values are:
+
+            - ``real``:     Plots the real part of the dirty image.
+
+            - ``imag``:     Plots the imaginary part of the dirty image.
+
+            - ``abs``:      Plot the absolute value of the dirty image.
+
+            Default is ``real``.
+
+        ax_unit: str | astropy.units.Unit, optional
+            The unit in which to show the ticks of the x and y-axes in.
+            The y-axis is the Declination (DEC) and the x-axis is the
+            Right Ascension (RA).
+            The latter one is defined as increasing from left to right!
+            The unit has to be given as a string or an ``astropy.units.Unit``.
+            The string must correspond to the string representation of an
+            ``astropy.units.Unit``.
+
+            Valid units are either ``pixel`` or angle units like ``arcsec``, ``degree``
+            etc. Default is ``pixel``.
+
+        center_pos: tuple | None, optional
+            The coordinate center of the image. The coordinates have to
+            be given in the unit defined in the parameter ``ax_unit`` above.
+            If ``ax_unit`` is set to ``pixel`` this parameter is ignored.
+            Default is ``None``, meaning the coordinates of the axes will be
+            given as relative.
+
+        norm : str | matplotlib.colors.Normalize | None, optional
+            The name of the norm or a matplotlib norm.
+            Possible values are:
+
+            - ``log``:          Returns a logarithmic norm with clipping on (!), meaning
+                                values above the maximum will be mapped to the maximum
+                                and values below the minimum will be mapped to the
+                                minimum, thus avoiding the appearance of a colormaps
+                                'over' and 'under' colors (e.g. in case of negative
+                                values).
+                                Depending on the use case this is desirable but in
+                                case that it is not, one can set the norm to
+                                ``log_noclip`` or provide a custom norm.
+
+            - ``log_noclip``:   Returns a logarithmic norm with clipping off.
+
+            - ``centered``:     Returns a linear norm which centered around zero.
+
+            - ``sqrt``:         Returns a power norm with exponent 0.5, meaning the
+                                square-root of the values.
+
+            - other:            A value not declared above will be returned as is,
+                                meaning that this could be any value which exists in
+                                matplotlib itself.
+
+            Default is ``None``, meaning no norm will be applied.
+
+        colorbar_shrink: float, optional
+            The shrink parameter of the colorbar. This can be needed if the plot is
+            included as a subplot to adjust the size of the colorbar.
+            Default is ``1``, meaning original scale.
+
+        cmap: str | matplotlib.colors.Colormap, optional
+            The colormap to be used for the plot.
+            Default is ``'inferno'``.
+
+        plot_args : dict | None, optional
+            The additional arguments passed to the scatter plot.
+            Default is ``None``.
+
+        fig_args : dict | None, optional
+            The additional arguments passed to the figure.
+            If a figure object is given in the ``fig`` parameter, this
+            value will be discarded.
+            Default is ``None``.
+
+        save_to : str | PathLike | None, optional
+            The name of the file to save the plot to.
+            Default is ``None``, meaning the plot won't be saved.
+
+        save_args : dict | None, optional
+            The additional arguments passed to the ``fig.savefig`` call.
+            Default is ``{"bbox_inches":"tight"}``.
+
+        fig : matplotlib.figure.Figure | None, optional
+            A custom figure object.
+            If set to ``None``, the ``ax`` parameter also has to be ``None``!
+            Default is ``None``.
+
+        ax : matplotlib.axes.Axes | None, optional
+            A custom axes object.
+            If set to ``None``, the ``fig`` parameter also has to be ``None``!
+            Default is ``None``.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object.
+
+        ax : matplotlib.axes.Axes
+            The axes object.
+        """
+        return plotting.plot_dirty_beam(self[stokes_component], **kwargs)
+
     def plot_dirty_image(
         self, stokes_component: str = "I", **kwargs
     ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
-        """Plots the (u,v) dirty image, meaning the 2d Fourier transform of the
+        """Plots the dirty image, meaning the 2d Fourier transform of the
         gridded visibilities.
 
         Parameters
