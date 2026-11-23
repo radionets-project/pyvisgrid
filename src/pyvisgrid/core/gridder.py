@@ -39,6 +39,8 @@ from pyvisgrid.core.weights import (
 
 __all__ = ["GridData", "GridDataSeries", "Gridder"]
 
+WEIGHTING_SCHEMES = ("uniform", "natural")
+
 
 @dataclass
 class GridData:
@@ -450,105 +452,157 @@ class Gridder:
 
         return self.stokes[i]
 
+    @staticmethod
+    def _cell_weights(weight_grid: np.ndarray, weighting: str) -> np.ndarray:
+        """Imaging weight per grid cell for the given weighting scheme.
+
+        For nearest-neighbour gridding every weighting scheme reduces to a
+        weight ``rho_k`` per cell that multiplies the weighted mean
+        visibility of that cell.
+
+        Parameters
+        ----------
+        weight_grid : numpy.ndarray
+            The summed noise weights per cell, ``W_k = sum_i w_i``.
+
+        weighting : str
+            ``'natural'``: ``rho_k = W_k``.
+            ``'uniform'``: ``rho_k = 1`` for every occupied cell.
+
+        Returns
+        -------
+        numpy.ndarray
+            The imaging weight ``rho_k`` per cell.
+        """
+        match weighting:
+            case "natural":
+                return weight_grid.copy()
+            case "uniform":
+                return (weight_grid > 0).astype(np.float64)
+            case _:
+                raise ValueError(
+                    f"Unknown weighting '{weighting}'. "
+                    f"Supported are: {', '.join(WEIGHTING_SCHEMES)}."
+                )
+
     def _grid(
-        self, grid_data: GridData, u_wave: np.ndarray, v_wave: np.ndarray
+        self,
+        grid_data: GridData,
+        u_wave: np.ndarray,
+        v_wave: np.ndarray,
+        weighting: str = "uniform",
     ) -> GridData:
         """Internal method that grids given visibility data using the default Gridder
         for the radionets-project.
 
+        The visibilities are gridded with nearest-neighbour binning on a grid
+        with cell size ``1 / fov``. Each cell holds the weighted mean of its
+        visibilities, ``V_k = sum_i w_i V_i / W_k`` with ``W_k = sum_i w_i``.
+        With the imaging weight ``rho_k`` of the chosen weighting scheme
+        the dirty image and dirty beam are
+
+        ``dirty_image = F^-1[rho * V] / sum(rho)`` and
+        ``dirty_beam = F^-1[rho] / sum(rho)``,
+
+        i.e. the dirty beam has a peak of 1 and the dirty image is in Jy/beam.
+
         Parameters
         ----------
         grid_data : GridData
-        The ``GridData`` data object containing the visibilities.
+            The ``GridData`` data object containing the visibilities
+            and (optionally) their noise weights.
 
-        u_wave: numpy.ndarray
-        The u coordinates in units of wavelength.
+        u_wave : numpy.ndarray
+            The u coordinates in units of wavelength.
 
-        v_wave: numpy.ndarray
-        The v coordinates in units of wavelength.
+        v_wave : numpy.ndarray
+            The v coordinates in units of wavelength.
 
+        weighting : str, optional
+            The weighting scheme, ``'uniform'`` or ``'natural'``.
+            Default is ``'uniform'``.
 
         Returns
         -------
-        mask : numpy.ndarray, optional
-            The mask created from the given (u,v) coordinates. The mask contains
-            the number of (u,v) coordinates per pixel.
-
-        mask_real : numpy.ndarray, optional
-            The gridded real part of the visibilites.
-
-        mask_imag : numpy.ndarray, optional
-            The gridded imaginary part of the visibilities.
-
-        dirty_img_complex : numpy.ndarray, optional
-            The complex Dirty Image. This is the 2-dimensional Fourier transform
-            of the gridded visibilities.
+        GridData
+            The input ``GridData`` with ``fov``, ``mask``, ``mask_real``,
+            ``mask_imag``, ``weight_grid``, ``weight_sum``, ``dirty_beam``
+            and ``dirty_image`` set.
         """
+        if weighting not in WEIGHTING_SCHEMES:
+            raise ValueError(
+                f"Unknown weighting '{weighting}'. "
+                f"Supported are: {', '.join(WEIGHTING_SCHEMES)}."
+            )
 
-        stokes = grid_data.vis_data
+        vis = np.asarray(grid_data.vis_data).ravel()
+        weights = grid_data.get_weights()
 
-        real = stokes.real.T
-        imag = stokes.imag.T
-
-        u_wave_full = np.append(-u_wave.ravel(), u_wave.ravel())
-        v_wave_full = np.append(-v_wave.ravel(), v_wave.ravel())
-        stokes_real_full = np.append(real.ravel(), real.ravel())
-        stokes_imag_full = np.append(-imag.ravel(), imag.ravel())
+        # Hermitian completion: V(-u, -v) = conj(V(u, v))
+        u_full = np.concatenate([-u_wave.ravel(), u_wave.ravel()])
+        v_full = np.concatenate([-v_wave.ravel(), v_wave.ravel()])
+        vis_full = np.concatenate([vis.conj(), vis])
+        weights_full = np.concatenate([weights, weights])
 
         N = self.img_size
+        delta_uv = self.fov ** (-1)
 
-        delta_uv = (self.fov) ** (-1)
+        # cell index: cell j covers [(j - N/2 - 1/2), (j - N/2 + 1/2)) * delta_uv,
+        # so that (u, v) = (0, 0) lies at the centre of cell (N/2, N/2)
+        iu = np.floor(u_full / delta_uv + N / 2 + 1 / 2).astype(np.int64)
+        iv = np.floor(v_full / delta_uv + N / 2 + 1 / 2).astype(np.int64)
 
-        bins = np.arange(
-            start=-(N / 2 + 1 / 2) * delta_uv,
-            stop=(N / 2 + 1 / 2) * delta_uv,
-            step=delta_uv,
-            dtype=np.float128,
+        valid = (iu >= 0) & (iu < N) & (iv >= 0) & (iv < N) & (weights_full > 0)
+
+        # rows = v, columns = u
+        cell_idx = iv[valid] * N + iu[valid]
+        w = weights_full[valid]
+        v = vis_full[valid]
+
+        def _accumulate(values: np.ndarray | None = None) -> np.ndarray:
+            return np.bincount(cell_idx, weights=values, minlength=N * N).reshape(
+                N, N
+            )
+
+        mask = _accumulate().astype(np.float64)
+        weight_grid = _accumulate(w)
+        vis_sum = _accumulate(w * v.real) + 1j * _accumulate(w * v.imag)
+
+        vis_mean = np.divide(
+            vis_sum,
+            weight_grid,
+            out=np.zeros_like(vis_sum),
+            where=weight_grid > 0,
         )
 
-        mask, *_ = np.histogram2d(
-            x=u_wave_full, y=v_wave_full, bins=[bins, bins], density=False
-        )
-        mask = (
-            mask.T
-        )  # u (x) is histogrammed along the first dimension (rows) --> transpose
-        mask[mask == 0] = 1
+        cell_weights = self._cell_weights(weight_grid, weighting)
+        weight_sum = float(cell_weights.sum())
 
-        mask_real, _, _ = np.histogram2d(
-            x=u_wave_full,
-            y=v_wave_full,
-            bins=[bins, bins],
-            weights=stokes_real_full,
-            density=False,
-        )
-        mask_imag, _, _ = np.histogram2d(
-            x=u_wave_full,
-            y=v_wave_full,
-            bins=[bins, bins],
-            weights=stokes_imag_full,
-            density=False,
-        )
+        if weight_sum <= 0:
+            raise ValueError(
+                "There are no visibilities with a positive weight inside the grid!"
+            )
 
-        mask_real = mask_real.T  # see above
-        mask_imag = mask_imag.T  # see above
-
-        mask_real /= mask
-        mask_imag /= mask
+        def _to_image(uv_grid: np.ndarray) -> np.ndarray:
+            # ifft2 includes a factor 1 / N^2, rescale to 1 / sum(rho)
+            return np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(uv_grid))) * (
+                N**2 / weight_sum
+            )
 
         grid_data.fov = self.fov
         grid_data.mask = mask
-        grid_data.mask_real = mask_real
-        grid_data.mask_imag = mask_imag
-        beam_mask = np.zeros_like(grid_data.mask_real, dtype=np.complex128)
-        beam_mask[grid_data.mask > 1] = 1.0 + 0.0j
-        grid_data.dirty_beam = np.fft.fftshift(np.fft.ifft2(np.fft.fftshift(beam_mask)))
-        grid_data.dirty_image = np.fft.fftshift(
-            np.fft.ifft2(np.fft.fftshift(mask_real + 1j * mask_imag))
-        )
+        grid_data.mask_real = vis_mean.real
+        grid_data.mask_imag = vis_mean.imag
+        grid_data.weight_grid = weight_grid
+        grid_data.weight_sum = weight_sum
+        grid_data.dirty_beam = _to_image(cell_weights.astype(np.complex128))
+        grid_data.dirty_image = _to_image(cell_weights * vis_mean)
 
         return grid_data
 
-    def grid(self, stokes_component: str = "I") -> GridData:
+    def grid(
+        self, stokes_component: str = "I", weighting: str = "uniform"
+    ) -> GridData:
         """Grids given visibility data using the default Gridder for the
         radionets-project.
 
@@ -559,6 +613,11 @@ class Gridder:
             The specified component has to be initialized first!
             Otherwise this will result in a ``KeyError``.
             Default is ``'I'``.
+
+        weighting : str, optional
+            The weighting scheme, ``'uniform'`` (every occupied cell has the
+            same weight) or ``'natural'`` (every cell is weighted with the sum
+            of its noise weights). Default is ``'uniform'``.
 
         Returns
         -------
@@ -586,6 +645,7 @@ class Gridder:
             grid_data=self.stokes[stokes_component],
             u_wave=self.u_wave,
             v_wave=self.v_wave,
+            weighting=weighting,
         )
 
     def grid_time_series(
@@ -595,6 +655,7 @@ class Gridder:
         time_end_idx: int | None = None,
         stokes_component: str = "I",
         show_progress: bool = True,
+        weighting: str = "uniform",
     ) -> GridDataSeries:
         """Grids the visibilites in a time series so that time steps get
         gridded individually.
@@ -622,6 +683,10 @@ class Gridder:
         show_progress : bool, optional
             Whether to show a progress bar for the gridding progress.
             Default is ``True``.
+
+        weighting : str, optional
+            The weighting scheme, ``'uniform'`` or ``'natural'``.
+            Default is ``'uniform'``.
 
         Returns
         -------
@@ -654,6 +719,7 @@ class Gridder:
                     grid_data=grid_data_series.get_vis_step(step=idx),
                     u_wave=u_wave,
                     v_wave=v_wave,
+                    weighting=weighting,
                 )
             )
 
