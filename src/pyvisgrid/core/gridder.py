@@ -914,7 +914,7 @@ class Gridder:
             else None,
         )
 
-        instance.stokes["I"] = GridData(
+        instance.stokes[stokes_component] = GridData(
             vis_data=stokes.ravel(), weights=weights.ravel()
         )
 
