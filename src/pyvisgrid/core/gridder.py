@@ -560,9 +560,7 @@ class Gridder:
         v = vis_full[valid]
 
         def _accumulate(values: np.ndarray | None = None) -> np.ndarray:
-            return np.bincount(cell_idx, weights=values, minlength=N * N).reshape(
-                N, N
-            )
+            return np.bincount(cell_idx, weights=values, minlength=N * N).reshape(N, N)
 
         mask = _accumulate().astype(np.float64)
         weight_grid = _accumulate(w)
@@ -600,9 +598,7 @@ class Gridder:
 
         return grid_data
 
-    def grid(
-        self, stokes_component: str = "I", weighting: str = "uniform"
-    ) -> GridData:
+    def grid(self, stokes_component: str = "I", weighting: str = "uniform") -> GridData:
         """Grids given visibility data using the default Gridder for the
         radionets-project.
 
