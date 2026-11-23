@@ -5,7 +5,7 @@ from pyvisgrid.core.stokes import get_stokes_from_vis_data
 
 def read_ms_weights(tab, shape: tuple[int, int, int]) -> np.ndarray:
     """Noise weights of shape (nrow, nchan, ncorr):
-    WEIGHT_SPECTRUM → WEIGHT (broadcast over channels) → 1/SIGMA²."""
+    WEIGHT_SPECTRUM → WEIGHT (broadcast over channels) → 1/SIGMA^2."""
     cols = tab.colnames()
     if "WEIGHT_SPECTRUM" in cols and tab.iscelldefined("WEIGHT_SPECTRUM", 0):
         return tab.getcol("WEIGHT_SPECTRUM").astype(np.float64)
@@ -20,11 +20,8 @@ def read_ms_weights(tab, shape: tuple[int, int, int]) -> np.ndarray:
 def combine_weights(w_a: np.ndarray, w_b: np.ndarray) -> np.ndarray:
     """Inverse-variance weight of V_a ± V_b, i.e. 1/w = 1/w_a + 1/w_b.
     Zero if either input is zero (flagged)."""
-    w_a = np.asarray(w_a, dtype=np.float64)
-    w_b = np.asarray(w_b, dtype=np.float64)
-    denom = w_a + w_b
     return np.divide(
-        w_a * w_b, denom, out=np.zeros_like(denom), where=(w_a > 0) & (w_b > 0)
+        w_a * w_b, w_a + w_b, out=np.zeros_like(w_a), where=(w_a > 0) & (w_b > 0)
     )
 
 
@@ -60,9 +57,8 @@ def get_stokes_weights_from_vis_data(
         ``get_stokes_from_vis_data``. Samples where a contributing correlation
         has a weight <= 0 (flagged) get weight 0.
     """
-    corr_weights = np.clip(
-        np.asarray(vis_data[..., 2], dtype=np.float64), a_min=0.0, a_max=None
-    )
+    corr_weights = vis_data[..., 2]
+    corr_weights[corr_weights < 0] = 0.0
     n_corr = corr_weights.shape[-1]
 
     # coefficient a_k of correlation k: Stokes visibility of the unit vector e_k

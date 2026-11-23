@@ -831,7 +831,6 @@ class Gridder:
 
         if filter_flagged:
             flag_mask = main_tab.getcol("FLAG")
-            weights[flag_mask] = 0.0
             flag_mask = flag_mask.reshape((flag_mask.shape[0], -1)).astype(np.uint8)
             flag_mask = np.prod(flag_mask, axis=1)
 
